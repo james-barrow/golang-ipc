@@ -12,7 +12,7 @@ import (
 // timeout = number of seconds before the socket/pipe times out trying to connect/re-cconnect - if -1 or 0 it never times out.
 // retryTimer = number of seconds before the client tries to connect again.
 //
-func StartClient(ipcName string, timeout int, retryTimer int) (*Client, error) {
+func StartClient(ipcName string, config *ClientConfig) (*Client, error) {
 
 	err := checkIpcName(ipcName)
 	if err != nil {
@@ -26,19 +26,30 @@ func StartClient(ipcName string, timeout int, retryTimer int) (*Client, error) {
 		recieved: make(chan Message),
 	}
 
-	if timeout == -1 {
-		cc.timeout = 0
-	} else {
-		cc.timeout = float64(timeout)
-	}
+	if config == nil {
 
-	if retryTimer == -1 {
+		cc.timeout = 0
 		cc.retryTimer = time.Duration(2)
+		cc.maxMsgSize = maxMsgSize
+
 	} else {
-		if retryTimer == 0 {
+
+		if config.Timeout < 0 {
+			cc.timeout = 0
+		} else {
+			cc.timeout = config.Timeout
+		}
+
+		if config.RetryTimer < 1 {
 			cc.retryTimer = time.Duration(2)
 		} else {
-			cc.retryTimer = time.Duration(retryTimer)
+			cc.retryTimer = time.Duration(config.RetryTimer)
+		}
+
+		if config.MaxMsgSize < 1024 {
+			cc.maxMsgSize = maxMsgSize
+		} else {
+			cc.maxMsgSize = config.MaxMsgSize
 		}
 	}
 
@@ -66,7 +77,7 @@ func startClient(cc *Client) {
 
 func (cc *Client) read() {
 
-	buff := make([]byte, maxMsgSize+14)
+	buff := make([]byte, cc.maxMsgSize+14)
 	for {
 
 		i, err := cc.conn.Read(buff)
@@ -144,7 +155,7 @@ func (cc *Client) reconnect() {
 	err := cc.dial() // connect to the pipe
 	if err != nil {
 		if err.Error() == "Timed out trying to connect" {
-			cc.recieved <- Message{err: errors.New("Timed out try to re-connect"), msgType: 0}
+			cc.recieved <- Message{err: errors.New("Timed out trying to re-connect"), msgType: 0}
 		}
 		close(cc.recieved)
 		return
@@ -176,10 +187,10 @@ func (cc *Client) Read() (uint32, []byte, error) {
 func (cc *Client) Write(msgType uint32, message []byte) error {
 
 	if msgType == 0 {
-		return errors.New("Message type 0 is reserved for local error messages")
+		return errors.New("Message type 0 is reserved")
 	}
 
-	if len(message) > maxMsgSize {
+	if len(message) > cc.maxMsgSize {
 		return errors.New("Message exceeds maximum message length")
 	}
 

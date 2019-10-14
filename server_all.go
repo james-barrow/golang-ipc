@@ -10,7 +10,7 @@ import (
 // ipcName = is the name of the unix socket or named pipe that will be created.
 // timeout = number of seconds before the socket/pipe times out waiting for a connection/re-cconnection - if -1 or 0 it never times out.
 //
-func StartServer(ipcName string, timeout int) (*Server, error) {
+func StartServer(ipcName string, config *ServerConfig) (*Server, error) {
 
 	err := checkIpcName(ipcName)
 	if err != nil {
@@ -23,10 +23,23 @@ func StartServer(ipcName string, timeout int) (*Server, error) {
 		recieved: make(chan Message),
 	}
 
-	if timeout == -1 {
+	if config == nil {
 		sc.timeout = 0
+		sc.maxMsgSize = maxMsgSize
+
 	} else {
-		sc.timeout = time.Duration(timeout)
+
+		if config.Timeout < 0 {
+			sc.timeout = 0
+		} else {
+			sc.timeout = config.Timeout
+		}
+
+		if config.MaxMsgSize < 1024 {
+			sc.maxMsgSize = maxMsgSize
+		} else {
+			sc.maxMsgSize = config.MaxMsgSize
+		}
 	}
 
 	go startServer(sc)
@@ -91,7 +104,7 @@ func (sc *Server) connectionTimer() error {
 
 func (sc *Server) read() {
 
-	buff := make([]byte, maxMsgSize+14)
+	buff := make([]byte, sc.maxMsgSize+14)
 
 	for {
 		i, err := sc.conn.Read(buff)
@@ -185,10 +198,10 @@ func (sc *Server) Read() (uint32, []byte, error) {
 func (sc *Server) Write(msgType uint32, message []byte) error {
 
 	if msgType == 0 {
-		return errors.New("Message type 0 is reserved for local error messages")
+		return errors.New("Message type 0 is reserved")
 	}
 
-	if len(message) > maxMsgSize {
+	if len(message) > sc.maxMsgSize {
 		return errors.New("Message exceeds maximum message length")
 	}
 

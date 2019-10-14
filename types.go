@@ -14,6 +14,7 @@ type Server struct {
 	recieved    chan (Message)
 	connChannel chan bool
 	timeout     time.Duration
+	maxMsgSize  int
 }
 
 // Client - holds the details of the client connection and config.
@@ -24,6 +25,7 @@ type Client struct {
 	timeout    float64       //
 	retryTimer time.Duration // number of seconds before trying to connect again
 	recieved   chan (Message)
+	maxMsgSize int
 }
 
 // Message - contains the  recieved message
@@ -61,11 +63,13 @@ const (
 
 // ServerConfig - used to pass configuation overrides to ServerStart()
 type ServerConfig struct {
-	Timeout float64
+	Timeout    time.Duration
+	MaxMsgSize int
 }
 
 // ClientConfig - used to pass configuation overrides to ClientStart()
 type ClientConfig struct {
 	Timeout    float64
 	RetryTimer time.Duration
+	MaxMsgSize int
 }

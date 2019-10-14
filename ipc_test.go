@@ -7,58 +7,100 @@ import (
 
 func TestStartUp_Name(t *testing.T) {
 
-	_, err := StartServer("", -1)
-	if err == nil {
-		t.Error(err)
+	_, err := StartServer("", nil)
+	if err.Error() != "ipcName cannot be an empty string" {
+		t.Error("server - should have an error becuse the ipc name is empty")
 	}
-
-	_, err2 := StartClient("", -1, -1)
-	if err2 == nil {
-		t.Error(err)
+	_, err2 := StartClient("", nil)
+	if err2.Error() != "ipcName cannot be an empty string" {
+		t.Error("client - should have an error becuse the ipc name is empty")
 	}
 
 }
 
-func TestStartUp_Timers(t *testing.T) {
+func TestStartUp_Configs(t *testing.T) {
 
-	_, err := StartServer("test", -1)
+	_, err := StartServer("test", nil)
 	if err != nil {
 		t.Error(err)
 	}
 
-	_, err2 := StartServer("test", -1)
+	_, err2 := StartClient("test", nil)
 	if err2 != nil {
-		t.Error(err2)
-	}
-
-	_, err3 := StartClient("test", -1, -1)
-	if err3 != nil {
 		t.Error(err)
 	}
 
-	_, err4 := StartClient("test", -1, 0)
+	scon := &ServerConfig{}
+
+	ccon := &ClientConfig{}
+
+	_, err3 := StartServer("test", scon)
+	if err3 != nil {
+		t.Error(err2)
+	}
+
+	_, err4 := StartClient("test", ccon)
 	if err4 != nil {
 		t.Error(err)
 	}
 
+	scon.Timeout = -1
+	scon.MaxMsgSize = -1
+
+	_, err5 := StartServer("test", scon)
+	if err5 != nil {
+		t.Error(err2)
+	}
+
+	ccon.Timeout = -1
+	ccon.RetryTimer = -1
+	ccon.MaxMsgSize = 0
+
+	_, err6 := StartClient("test", ccon)
+	if err6 != nil {
+		t.Error(err)
+	}
+
+	scon.MaxMsgSize = 1025
+	ccon.MaxMsgSize = 1025
+	ccon.RetryTimer = 1
+
+	_, err7 := StartServer("test", scon)
+	if err7 != nil {
+		t.Error(err2)
+	}
+
+	_, err8 := StartClient("test", ccon)
+	if err8 != nil {
+		t.Error(err)
+	}
 }
 
 func TestStartUp_Timeout(t *testing.T) {
 
-	sc, _ := StartServer("test", 1)
+	scon := &ServerConfig{
+		Timeout: 1,
+	}
+
+	sc, _ := StartServer("test_dummy", scon)
 
 	_, _, err := sc.Read()
 
-	if err == nil {
-		t.Error(err)
+	if err.Error() != "Timed out waiting for client to connect" {
+		t.Error("should of got server timeout")
 	}
 
-	cc, _ := StartClient("test2", 1, 1)
+	ccon := &ClientConfig{
+		Timeout:    2,
+		RetryTimer: 1,
+	}
+
+	cc, _ := StartClient("test2", ccon)
 
 	_, _, err2 := cc.Read()
 
-	if err2 == nil {
-		t.Error(err2)
+	if err2.Error() != "Timed out trying to connect" {
+		t.Error("should of got timeout as client was trying to connect")
 	}
 
 }
@@ -66,68 +108,64 @@ func TestStartUp_Timeout(t *testing.T) {
 func TestWrite(t *testing.T) {
 
 	// 3 x Server side tests
-	sIPC := &Server{
-		name:     "Test",
-		status:   NotConnected,
-		recieved: make(chan Message),
-		timeout:  0,
+	sc := &Server{
+		name:       "Test_write",
+		status:     Connected,
+		recieved:   make(chan Message),
+		timeout:    0,
+		maxMsgSize: maxMsgSize,
 	}
 
 	buf := make([]byte, 1)
 
-	err := sIPC.Write(0, buf)
-	if err == nil {
-		t.Error("0 is not allowwed as a message type")
+	err := sc.Write(0, buf)
+	if err.Error() != "Message type 0 is reserved" {
+		t.Error("0 is not allowed as a message type")
 	}
 
-	err = sIPC.Write(1, buf)
-	if err == nil {
-		t.Error("1 is not allowwed as a message type")
-	}
+	buf = make([]byte, sc.maxMsgSize+5)
+	err2 := sc.Write(2, buf)
 
-	buf = make([]byte, maxMsgSize+5)
-	err = sIPC.Write(2, buf)
-	if err == nil {
+	if err2.Error() != "Message exceeds maximum message length" {
 		t.Error("There should be an error as the data we're attempting to write is bigger than the maxMsgSize")
 	}
 
-	buf = make([]byte, 5)
-	err = sIPC.Write(2, buf)
-	if err.Error() == "Not Connected" {
+	sc.status = NotConnected
+
+	buf2 := make([]byte, 5)
+	err3 := sc.Write(2, buf2)
+	if err3.Error() == "Not Connected" {
 
 	} else {
 		t.Error("we should have an error becuse there is no connection")
 	}
 
 	// 3 x client side tests
-	cIPC := &Client{
-		Name:       "test",
+	cc := &Client{
+		Name:       "test_Write",
 		timeout:    0,
 		retryTimer: 1,
-		status:     NotConnected,
-		//	Recieved:   make(chan Message),
+		status:     Connected,
+		maxMsgSize: maxMsgSize,
 	}
 
 	buf = make([]byte, 1)
 
-	err = cIPC.Write(0, buf)
-	if err == nil {
-		t.Error("0 is not allowwed as a message try")
-	}
-
-	err = cIPC.Write(1, buf)
+	err = cc.Write(0, buf)
 	if err == nil {
 		t.Error("0 is not allowwed as a message try")
 	}
 
 	buf = make([]byte, maxMsgSize+5)
-	err = cIPC.Write(2, buf)
+	err = cc.Write(2, buf)
 	if err == nil {
 		t.Error("There should be an error is the data we're attempting to write is bigger than the maxMsgSize")
 	}
 
+	cc.status = NotConnected
+
 	buf = make([]byte, 5)
-	err = cIPC.Write(2, buf)
+	err = cc.Write(2, buf)
 	if err.Error() == "Not Connected" {
 
 	} else {
@@ -271,22 +309,12 @@ func TestStatus(t *testing.T) {
 	cc.getStatus()
 	cc.Status()
 
-}
-func connect(t *testing.T) (sc *Server, cc *Client, err error) {
-
-	sc, err = StartServer("test", 4)
-	if err != nil {
-		return nil, nil, err
+	cc2 := &Client{
+		status: 9,
 	}
 
-	time.Sleep(time.Second / 4)
-
-	cc, err2 := StartClient("test", 4, 1)
-	if err2 != nil {
-		return nil, nil, err2
-	}
-
-	return sc, cc, err
+	cc2.getStatus()
+	cc2.Status()
 
 }
 
@@ -311,14 +339,14 @@ func checkStatus(sc *Server, t *testing.T) bool {
 
 func TestGetConnected(t *testing.T) {
 
-	sc, err := StartServer("test22", 2)
+	sc, err := StartServer("test22", nil)
 	if err != nil {
 		t.Error(err)
 	}
 
 	time.Sleep(time.Second / 4)
 
-	_, err2 := StartClient("test22", 2, 1)
+	_, err2 := StartClient("test22", nil)
 	if err2 != nil {
 		t.Error(err)
 	}
@@ -341,14 +369,14 @@ func TestGetConnected(t *testing.T) {
 
 func TestServerReadWrite(t *testing.T) {
 
-	sc, err := StartServer("test3", 4)
+	sc, err := StartServer("test3", nil)
 	if err != nil {
 		t.Error(err)
 	}
 
 	time.Sleep(time.Second / 4)
 
-	cc, err2 := StartClient("test3", 4, 1)
+	cc, err2 := StartClient("test3", nil)
 	if err2 != nil {
 		t.Error(err)
 	}
@@ -409,28 +437,18 @@ func TestServerReadWrite(t *testing.T) {
 		t.Error(err)
 	}
 
-	cc.conn.Close()
-	_, _, err4 := sc.Read()
-
-	if err4 == nil {
-		t.Error("Read should return an error as the client has closed the connection")
-	} else {
-		if err4.Error() != "Timed out trying to re-connect" {
-			t.Error("should have timed out trying to re-connect")
-		}
-	}
 }
 
 func TestClientReadWrite(t *testing.T) {
 
-	sc, err := StartServer("test4", 4)
+	sc, err := StartServer("test4", nil)
 	if err != nil {
 		t.Error(err)
 	}
 
 	time.Sleep(time.Second / 4)
 
-	cc, err2 := StartClient("test4", 4, 1)
+	cc, err2 := StartClient("test4", nil)
 	if err2 != nil {
 		t.Error(err)
 	}
@@ -491,32 +509,18 @@ func TestClientReadWrite(t *testing.T) {
 		t.Error(err)
 	}
 
-	sc.status = Closing
-	sc.listen.Close()
-	sc.conn.Close()
-
-	_, _, err4 := cc.Read()
-
-	if err4 == nil {
-		t.Error("Read should return an error as the client has closed the connection")
-	} else {
-		if err4.Error() != "Timed out try to re-connect" {
-			t.Error("should have timed out trying to re-connect")
-		}
-	}
-
 }
 
 func TestClientWrongVersionNumber(t *testing.T) {
 
-	sc, err := StartServer("test5", 4)
+	sc, err := StartServer("test5", nil)
 	if err != nil {
 		t.Error(err)
 	}
 
 	time.Sleep(time.Second / 4)
 
-	cc, err2 := StartClient("test5", 4, 1)
+	cc, err2 := StartClient("test5", nil)
 	if err2 != nil {
 		t.Error(err)
 	}
@@ -549,14 +553,14 @@ func TestClientWrongVersionNumber(t *testing.T) {
 
 func TestServerWrongVersionNumber(t *testing.T) {
 
-	sc, err := StartServer("test6", 4)
+	sc, err := StartServer("test6", nil)
 	if err != nil {
 		t.Error(err)
 	}
 
 	time.Sleep(time.Second / 4)
 
-	cc, err2 := StartClient("test6", 4, 1)
+	cc, err2 := StartClient("test6", nil)
 	if err2 != nil {
 		t.Error(err)
 	}
@@ -587,14 +591,14 @@ func TestServerWrongVersionNumber(t *testing.T) {
 
 func TestReconnect(t *testing.T) {
 
-	sc, err := StartServer("test7", 4)
+	sc, err := StartServer("test7", nil)
 	if err != nil {
 		t.Error(err)
 	}
 
 	time.Sleep(time.Second / 4)
 
-	cc, err2 := StartClient("test7", 4, 1)
+	cc, err2 := StartClient("test7", nil)
 	if err2 != nil {
 		t.Error(err)
 	}
@@ -612,13 +616,13 @@ func TestReconnect(t *testing.T) {
 		t.Error("client should be trying to re-connect")
 	}
 
-	sc, err4 := StartServer("test7", 2)
+	sc, err4 := StartServer("test7", nil)
 
 	if err4 != nil {
 		t.Error(err4)
 	}
 
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 3)
 
 	if cc.status != Connected {
 		t.Error("client should be connected")
@@ -631,7 +635,7 @@ func TestReconnect(t *testing.T) {
 		t.Error("server should be trying to re-connect")
 	}
 
-	cc, err5 := StartClient("test7", 2, 1)
+	cc, err5 := StartClient("test7", nil)
 
 	if err5 != nil {
 		t.Error(err5)
@@ -645,16 +649,88 @@ func TestReconnect(t *testing.T) {
 
 }
 
-func TestMultiMessageType(t *testing.T) {
+func TestTimeoutReconnect(t *testing.T) {
 
-	sc, err := StartServer("test8", 4)
+	//server closes, client times out
+
+	scon := &ServerConfig{
+		Timeout: 1,
+	}
+
+	ccon := &ClientConfig{
+		Timeout:    2,
+		RetryTimer: 1,
+	}
+
+	sc, err := StartServer("test_timeout", scon)
 	if err != nil {
 		t.Error(err)
 	}
 
 	time.Sleep(time.Second / 4)
 
-	cc, err2 := StartClient("test8", 4, 1)
+	cc, err2 := StartClient("test_timeout", ccon)
+	if err2 != nil {
+		t.Error(err)
+	}
+
+	if checkStatus(sc, t) == false {
+		t.FailNow()
+	}
+
+	sc.Close()
+
+	_, _, err5 := cc.Read()
+	if err5.Error() != "Timed out trying to re-connect" {
+		t.Error("client should have timed out")
+	}
+
+	//client closes, server times out
+
+	scon2 := &ServerConfig{
+		Timeout: 2,
+	}
+
+	ccon2 := &ClientConfig{
+		Timeout:    2,
+		RetryTimer: 1,
+	}
+
+	sc2, err8 := StartServer("test_timeout2", scon2)
+	if err8 != nil {
+		t.Error(err)
+	}
+
+	time.Sleep(time.Second / 4)
+
+	cc2, err9 := StartClient("test_timeout2", ccon2)
+	if err9 != nil {
+		t.Error(err)
+	}
+
+	if checkStatus(sc2, t) == false {
+		t.FailNow()
+	}
+
+	cc2.Close()
+
+	_, _, err10 := sc2.Read()
+	if err10.Error() != "Timed out trying to re-connect" {
+		t.Error("server should have timed out")
+	}
+
+}
+
+func TestMultiMessageType(t *testing.T) {
+
+	sc, err := StartServer("test8", nil)
+	if err != nil {
+		t.Error(err)
+	}
+
+	time.Sleep(time.Second / 4)
+
+	cc, err2 := StartClient("test8", nil)
 	if err2 != nil {
 		t.Error(err)
 	}
@@ -687,14 +763,14 @@ func TestMultiMessageType(t *testing.T) {
 
 func TestServerClose(t *testing.T) {
 
-	sc, err := StartServer("test9", 4)
+	sc, err := StartServer("test9", nil)
 	if err != nil {
 		t.Error(err)
 	}
 
 	time.Sleep(time.Second / 4)
 
-	_, err2 := StartClient("test9", 4, 1)
+	_, err2 := StartClient("test9", nil)
 	if err2 != nil {
 		t.Error(err)
 	}
@@ -714,14 +790,14 @@ func TestServerClose(t *testing.T) {
 
 func TestClientClose(t *testing.T) {
 
-	sc, err := StartServer("test10", 4)
+	sc, err := StartServer("test10", nil)
 	if err != nil {
 		t.Error(err)
 	}
 
 	time.Sleep(time.Second / 4)
 
-	cc, err2 := StartClient("test10", 4, 1)
+	cc, err2 := StartClient("test10", nil)
 	if err2 != nil {
 		t.Error(err)
 	}
