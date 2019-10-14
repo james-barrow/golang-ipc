@@ -17,7 +17,7 @@ func main() {
 
 func server() {
 
-	ipcm, err := ipc.StartServer("testtest", -1)
+	ipcm, err := ipc.StartServer("testtest", nil)
 	if err != nil {
 		log.Println(err)
 		return
@@ -52,7 +52,7 @@ func readServerRecv(s *ipc.Server) {
 
 func client() {
 
-	ipcc, err := ipc.StartClient("testtest", -1, -1)
+	ipcc, err := ipc.StartClient("testtest", nil)
 	if err != nil {
 		log.Println(err)
 		return
