@@ -77,56 +77,72 @@ func startClient(cc *Client) {
 
 func (cc *Client) read() {
 
-	buff := make([]byte, cc.maxMsgSize+14)
+	header := make([]byte, 9)
+	buff := make([]byte, cc.maxMsgSize)
 	for {
 
-		i, err := cc.conn.Read(buff)
-		if err != nil {
-			if strings.Contains(err.Error(), "EOF") { // the connection has been closed by the client.
-				cc.conn.Close()
-
-				if cc.status != Closing || cc.status == Closed {
-					go cc.reconnect()
-				}
-				break
-
-			} else { // another error has occoured
-
-				if cc.status == Closing {
-					cc.recieved <- Message{err: errors.New("Connection closed"), msgType: 0}
-				} //else {
-				//cc.recieved <- Message{err: errors.New("Server closed the connection"), msgType: 0}
-				//}
-
-				cc.status = Closed
-				cc.conn.Close()
-				close(cc.recieved)
-				break
-			}
+		res := cc.readData(header)
+		if res == false {
+			break
 		}
 
-		header := readHeader(buff[:10])
+		ph := processHeader(header)
 
-		if header.msgType == 0 {
-			cc.msgTypeZero(buff[6:i])
+		if ph.msgType == 0 {
+
+			res := cc.readData(buff[:ph.msgLen])
+			if res == false {
+				break
+			}
+			cc.msgTypeZero(buff[:ph.msgLen])
+
 		} else {
 
-			if header.version != version {
+			if ph.version != version {
 				cc.writeControlMessage("WV")
 				cc.conn.Close()
 				cc.recieved <- Message{err: errors.New("Server sent the wrong version number"), msgType: 0}
 				break
 			}
 
-			if header.multiPart == 0 {
-				cc.recieved <- Message{data: buff[6:i], msgType: header.msgType, multiPart: header.multiPart, multiPartID: header.multiPartID}
-			} else {
-				// might want to do something different with multipart messages
-				cc.recieved <- Message{data: buff[10:i], msgType: header.msgType, multiPart: header.multiPart, multiPartID: header.multiPartID}
+			res := cc.readData(buff[:ph.msgLen])
+			if res == false {
+				break
 			}
+
+			cc.recieved <- Message{data: buff[:ph.msgLen], msgType: ph.msgType}
 
 		}
 	}
+}
+
+func (cc *Client) readData(buff []byte) bool {
+
+	_, err := cc.conn.Read(buff)
+	if err != nil {
+		if strings.Contains(err.Error(), "EOF") { // the connection has been closed by the client.
+			cc.conn.Close()
+
+			if cc.status != Closing || cc.status == Closed {
+				go cc.reconnect()
+			}
+
+			return false
+
+		}
+
+		if cc.status == Closing {
+			cc.recieved <- Message{err: errors.New("Connection closed"), msgType: 0}
+		}
+
+		cc.status = Closed
+		cc.conn.Close()
+		close(cc.recieved)
+		return false
+	}
+
+	return true
+
 }
 
 func (cc *Client) msgTypeZero(buf []byte) {
@@ -142,9 +158,8 @@ func (cc *Client) writeControlMessage(mess string) {
 
 	message := []byte(mess)
 
-	header := createHeader(version, 0, false, 0)
+	header := createHeader(version, 0, len(message))
 	header = append(header, message...)
-
 	_, _ = cc.conn.Write(header)
 }
 
@@ -190,13 +205,15 @@ func (cc *Client) Write(msgType uint32, message []byte) error {
 		return errors.New("Message type 0 is reserved")
 	}
 
-	if len(message) > cc.maxMsgSize {
+	mlen := len(message)
+
+	if mlen > cc.maxMsgSize {
 		return errors.New("Message exceeds maximum message length")
 	}
 
 	if cc.status == Connected {
 
-		header := createHeader(version, msgType, false, 34544)
+		header := createHeader(version, msgType, mlen)
 		header = append(header, message...)
 
 		_, _ = cc.conn.Write(header)

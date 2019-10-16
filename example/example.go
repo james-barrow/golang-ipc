@@ -17,17 +17,18 @@ func main() {
 
 func server() {
 
-	ipcm, err := ipc.StartServer("testtest", nil)
+	sc, err := ipc.StartServer("testtest", nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	go readServerRecv(ipcm)
+	go readServerRecv(sc)
 
 	for {
 
-		_ = ipcm.Write(5, []byte("hello client"))
+		_ = sc.Write(5, []byte("Hello Client"))
+		_ = sc.Write(7, []byte("Hello Client"))
 
 		time.Sleep(1 * time.Second)
 
@@ -52,18 +53,18 @@ func readServerRecv(s *ipc.Server) {
 
 func client() {
 
-	ipcc, err := ipc.StartClient("testtest", nil)
+	cc, err := ipc.StartClient("testtest", nil)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	go readClientRecv(ipcc)
+	go readClientRecv(cc)
 
 	for {
 
-		_ = ipcc.Write(1, []byte("hello server"))
-
+		_ = cc.Write(1, []byte("hello server"))
+		_ = cc.Write(9, []byte("hello server"))
 		time.Sleep(time.Second / 2)
 
 	}

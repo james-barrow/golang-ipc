@@ -104,32 +104,30 @@ func (sc *Server) connectionTimer() error {
 
 func (sc *Server) read() {
 
-	buff := make([]byte, sc.maxMsgSize+14)
+	header := make([]byte, 9)
+	buff := make([]byte, sc.maxMsgSize)
 
 	for {
-		i, err := sc.conn.Read(buff)
-		if err != nil {
 
-			if sc.status == Closing {
-				sc.recieved <- Message{err: errors.New("Connection closed"), msgType: 0}
-				sc.status = Closed
-				close(sc.recieved)
-				break
-
-			} else {
-				sc.status = ReConnecting
-				go sc.reConnect()
-				break
-			}
+		result := sc.readData(header)
+		if result == false {
+			break
 		}
 
-		header := readHeader(buff[:10])
+		ph := processHeader(header)
 
-		if header.msgType == 0 {
-			sc.msgTypeZero(buff[6:i])
+		if ph.msgType == 0 {
+
+			result := sc.readData(buff[:ph.msgLen])
+			if result == false {
+				break
+			}
+
+			sc.msgTypeZero(buff[:ph.msgLen])
+
 		} else {
 
-			if header.version != version {
+			if ph.version != version {
 				sc.writeControlMessage("WV")
 				sc.status = Error
 				sc.listen.Close()
@@ -138,15 +136,38 @@ func (sc *Server) read() {
 				break
 			}
 
-			if header.multiPart == 0 {
-				sc.recieved <- Message{data: buff[6:i], msgType: header.msgType, multiPart: header.multiPart, multiPartID: header.multiPartID}
-			} else {
-				// might want to do something different with multipart messages
-				sc.recieved <- Message{data: buff[10:i], msgType: header.msgType, multiPart: header.multiPart, multiPartID: header.multiPartID}
+			result := sc.readData(buff[:ph.msgLen])
+			if result == false {
+				break
 			}
+
+			sc.recieved <- Message{data: buff[:ph.msgLen], msgType: ph.msgType}
+
 		}
 
 	}
+}
+
+func (sc *Server) readData(buff []byte) bool {
+
+	_, err := sc.conn.Read(buff)
+	if err != nil {
+
+		if sc.status == Closing {
+			sc.recieved <- Message{err: errors.New("Connection closed"), msgType: 0}
+			sc.status = Closed
+			close(sc.recieved)
+			return false
+		}
+
+		sc.status = ReConnecting
+		go sc.reConnect()
+		return false
+
+	}
+
+	return true
+
 }
 
 func (sc *Server) msgTypeZero(buf []byte) {
@@ -162,7 +183,7 @@ func (sc *Server) writeControlMessage(mess string) {
 
 	message := []byte(mess)
 
-	header := createHeader(version, 0, false, 0)
+	header := createHeader(version, 0, len(message))
 	header = append(header, message...)
 
 	_, _ = sc.conn.Write(header)
@@ -201,16 +222,22 @@ func (sc *Server) Write(msgType uint32, message []byte) error {
 		return errors.New("Message type 0 is reserved")
 	}
 
-	if len(message) > sc.maxMsgSize {
+	mlen := len(message)
+
+	if mlen > sc.maxMsgSize {
 		return errors.New("Message exceeds maximum message length")
 	}
 
 	if sc.status == Connected {
 
-		header := createHeader(version, msgType, false, 0)
+		header := createHeader(version, msgType, mlen)
 		header = append(header, message...)
 
-		_, _ = sc.conn.Write(header)
+		_, err := sc.conn.Write(header)
+
+		if err != nil {
+			return err
+		}
 
 	} else {
 		return errors.New(sc.status.statusString())

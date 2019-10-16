@@ -30,12 +30,11 @@ type Client struct {
 
 // Message - contains the  recieved message
 type Message struct {
-	version     byte   // version of the ipc protocal
-	err         error  // details of any error
-	msgType     uint32 // type of message sent - 0 is reserved
-	multiPart   byte   // if the message is a multiple part message
-	multiPartID uint32 // if multi part message , this is the ID.
-	data        []byte // message data recieved
+	version byte   // version of the ipc protocal
+	err     error  // details of any error
+	msgType uint32 // type of message sent - 0 is reserved
+	msgLen  int    // length of the message recieved
+	data    []byte // message data recieved
 }
 
 // Status - Status of the connection

@@ -531,7 +531,7 @@ func TestClientWrongVersionNumber(t *testing.T) {
 
 	message := []byte("data")
 
-	cHeader := createHeader(2, 3, false, 0)
+	cHeader := createHeader(2, 3, len(message))
 
 	write := append(cHeader, message...)
 
@@ -571,7 +571,7 @@ func TestServerWrongVersionNumber(t *testing.T) {
 
 	message := []byte("data")
 
-	cHeader := createHeader(2, 3, false, 0)
+	cHeader := createHeader(2, 3, len(message))
 
 	write := append(cHeader, message...)
 
@@ -717,46 +717,6 @@ func TestTimeoutReconnect(t *testing.T) {
 	_, _, err10 := sc2.Read()
 	if err10.Error() != "Timed out trying to re-connect" {
 		t.Error("server should have timed out")
-	}
-
-}
-
-func TestMultiMessageType(t *testing.T) {
-
-	sc, err := StartServer("test8", nil)
-	if err != nil {
-		t.Error(err)
-	}
-
-	time.Sleep(time.Second / 4)
-
-	cc, err2 := StartClient("test8", nil)
-	if err2 != nil {
-		t.Error(err)
-	}
-
-	if checkStatus(sc, t) == false {
-		t.FailNow()
-	}
-
-	message := []byte("data")
-
-	cHeader := createHeader(1, 5, true, 123456789)
-
-	write := append(cHeader, message...)
-
-	sc.conn.Write(write)
-
-	_, _, err3 := cc.Read()
-	if err3 != nil {
-		t.Error("error with server sending multi message")
-	}
-
-	cc.conn.Write(write)
-
-	_, _, err4 := sc.Read()
-	if err4 != nil {
-		t.Error("error with client sending multi message")
 	}
 
 }
