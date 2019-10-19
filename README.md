@@ -8,7 +8,7 @@
 
  ### Testing
 
- The package has been tested on Mac, Windows and Linux and has over 98% test coverage.
+ The package has been tested on Mac, Windows and Linux and has over 96% test coverage.
 
 ### Licence
 
