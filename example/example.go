@@ -27,8 +27,9 @@ func server() {
 
 	for {
 
-		_ = sc.Write(5, []byte("Hello Client"))
-		_ = sc.Write(7, []byte("Hello Client"))
+		_ = sc.Write(5, []byte("Hello Client 1"))
+		_ = sc.Write(7, []byte("Hello Client 2"))
+		_ = sc.Write(9, []byte("Hello Client 3"))
 
 		time.Sleep(1 * time.Second)
 
