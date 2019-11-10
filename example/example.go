@@ -9,9 +9,13 @@ import (
 
 func main() {
 
+	log.Println("starting")
+
 	go server()
 
 	client()
+
+	//ipc.Enc()
 
 }
 
@@ -53,6 +57,8 @@ func readServerRecv(s *ipc.Server) {
 }
 
 func client() {
+
+	//config := &ipc.ClientConfig{RetryTimer: 2}
 
 	cc, err := ipc.StartClient("testtest", nil)
 	if err != nil {

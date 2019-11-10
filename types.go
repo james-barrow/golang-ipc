@@ -1,6 +1,7 @@
 package ipc
 
 import (
+	"crypto/cipher"
 	"net"
 	"time"
 )
@@ -11,28 +12,33 @@ type Server struct {
 	listen      net.Listener
 	conn        net.Conn
 	status      Status
-	recieved    chan (Message)
+	recieved    chan (*Message)
 	connChannel chan bool
 	timeout     time.Duration
+	encryption  bool
 	maxMsgSize  int
+	enc         *encryption
 }
 
 // Client - holds the details of the client connection and config.
 type Client struct {
-	Name       string
-	conn       net.Conn
-	status     Status
-	timeout    float64       //
-	retryTimer time.Duration // number of seconds before trying to connect again
-	recieved   chan (Message)
-	maxMsgSize int
+	Name          string
+	conn          net.Conn
+	status        Status
+	timeout       float64       //
+	retryTimer    time.Duration // number of seconds before trying to connect again
+	recieved      chan (*Message)
+	encryption    bool
+	encryptionReq bool
+	maxMsgSize    int
+	enc           *encryption
 }
 
 // Message - contains the  recieved message
 type Message struct {
 	version byte   // version of the ipc protocal
 	err     error  // details of any error
-	msgType uint32 // type of message sent - 0 is reserved
+	msgType int    // type of message sent - 0 is reserved
 	msgLen  int    // length of the message recieved
 	data    []byte // message data recieved
 }
@@ -64,11 +70,19 @@ const (
 type ServerConfig struct {
 	Timeout    time.Duration
 	MaxMsgSize int
+	Encryption bool
 }
 
 // ClientConfig - used to pass configuation overrides to ClientStart()
 type ClientConfig struct {
 	Timeout    float64
 	RetryTimer time.Duration
-	MaxMsgSize int
+	Encryption bool
+}
+
+// Encryption - encryption settings
+type encryption struct {
+	keyExchange string
+	encryption  string
+	cipher      *cipher.AEAD
 }

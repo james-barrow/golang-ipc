@@ -66,12 +66,18 @@ func (cc *Client) dial() error {
 			} else if strings.Contains(err.Error(), "connect: connection refused") == true {
 
 			} else {
-				return err
+				cc.recieved <- &Message{err: err, msgType: 0}
 			}
 
 		} else {
 
 			cc.conn = conn
+
+			err2 := cc.handshake()
+			if err2 != nil {
+				return err2
+			}
+
 			return nil
 		}
 

@@ -1,6 +1,8 @@
 package ipc
 
 import (
+	"net"
+	"os"
 	"testing"
 	"time"
 )
@@ -54,7 +56,6 @@ func TestStartUp_Configs(t *testing.T) {
 
 	ccon.Timeout = -1
 	ccon.RetryTimer = -1
-	ccon.MaxMsgSize = 0
 
 	_, err6 := StartClient("test", ccon)
 	if err6 != nil {
@@ -62,7 +63,6 @@ func TestStartUp_Configs(t *testing.T) {
 	}
 
 	scon.MaxMsgSize = 1025
-	ccon.MaxMsgSize = 1025
 	ccon.RetryTimer = 1
 
 	_, err7 := StartServer("test", scon)
@@ -111,7 +111,7 @@ func TestWrite(t *testing.T) {
 	sc := &Server{
 		name:       "Test_write",
 		status:     Connected,
-		recieved:   make(chan Message),
+		recieved:   make(chan *Message),
 		timeout:    0,
 		maxMsgSize: maxMsgSize,
 	}
@@ -179,7 +179,7 @@ func TestRead(t *testing.T) {
 	sIPC := &Server{
 		name:     "Test",
 		status:   NotConnected,
-		recieved: make(chan Message),
+		recieved: make(chan *Message),
 		timeout:  0,
 	}
 
@@ -205,9 +205,9 @@ func TestRead(t *testing.T) {
 
 	}(sIPC)
 
-	sIPC.recieved <- testMessage // add 1st message
-	sIPC.recieved <- testMessage // add 2nd message
-	close(sIPC.recieved)         // close channel
+	sIPC.recieved <- &testMessage // add 1st message
+	sIPC.recieved <- &testMessage // add 2nd message
+	close(sIPC.recieved)          // close channel
 
 	// Client - read tests
 
@@ -217,7 +217,7 @@ func TestRead(t *testing.T) {
 		timeout:    0,
 		retryTimer: 1,
 		status:     NotConnected,
-		recieved:   make(chan Message),
+		recieved:   make(chan *Message),
 	}
 
 	cIPC.status = Connected
@@ -242,9 +242,9 @@ func TestRead(t *testing.T) {
 
 	}()
 
-	cIPC.recieved <- testMessage2 // add 1st message
-	cIPC.recieved <- testMessage2 // add 2nd message
-	close(cIPC.recieved)          // close channel
+	cIPC.recieved <- &testMessage2 // add 1st message
+	cIPC.recieved <- &testMessage2 // add 2nd message
+	close(cIPC.recieved)           // close channel
 
 }
 
@@ -511,7 +511,7 @@ func TestClientReadWrite(t *testing.T) {
 
 }
 
-func TestClientWrongVersionNumber(t *testing.T) {
+func TestServerSendWrongVersionNumber(t *testing.T) {
 
 	sc, err := StartServer("test5", nil)
 	if err != nil {
@@ -520,43 +520,108 @@ func TestClientWrongVersionNumber(t *testing.T) {
 
 	time.Sleep(time.Second / 4)
 
-	cc, err2 := StartClient("test5", nil)
+	cc := &Client{
+		Name:          "",
+		status:        NotConnected,
+		recieved:      make(chan *Message),
+		encryptionReq: false,
+	}
+
+	base := "/tmp/"
+	sock := ".sock"
+	conn, _ := net.Dial("unix", base+"test5"+sock)
+
+	cc.conn = conn
+
+	recv := make([]byte, 2)
+	_, err2 := cc.conn.Read(recv)
 	if err2 != nil {
-		t.Error(err)
+		//return errors.New("failed to recieve handshake message")
 	}
 
-	if checkStatus(sc, t) == false {
-		t.FailNow()
+	if recv[0] != 4 {
+		cc.handshakeSendReply(1)
+		//return errors.New("server has sent a different version number")
 	}
-
-	message := []byte("data")
-
-	cHeader := createHeader(2, 3, len(message))
-
-	write := append(cHeader, message...)
-
-	cc.conn.Write(write)
 
 	_, _, err3 := sc.Read()
-	if err3 == nil {
-
-		t.Error("Should have client sent wrong version number")
+	if err3.Error() != "client has a different version number" {
+		t.Error("should have error because server sent the client the wrong version number")
 
 	}
-
-	_, _, err4 := cc.Read()
-	if err4 == nil {
-		t.Error("Should have server sent wrong version number")
-	}
-
 }
 
 func TestServerWrongVersionNumber(t *testing.T) {
 
-	sc, err := StartServer("test6", nil)
+	sc := &Server{
+		name:     "test6",
+		status:   NotConnected,
+		recieved: make(chan *Message),
+	}
+
+	go func() {
+
+		base := "/tmp/"
+		sock := ".sock"
+
+		os.RemoveAll(base + sc.name + sock)
+
+		sc.listen, _ = net.Listen("unix", base+sc.name+sock)
+
+		conn, _ := sc.listen.Accept()
+
+		sc.conn = conn
+
+		buff := make([]byte, 2)
+
+		buff[0] = byte(8)
+
+		buff[1] = byte(0)
+
+		_, err := sc.conn.Write(buff)
+		if err != nil {
+			//return errors.New("unable to send handshake ")
+		}
+
+		_, _, err4 := sc.Read()
+		if err4 == nil {
+			t.Error("Should have server sent wrong version number")
+		}
+
+	}()
+
+	time.Sleep(time.Second)
+
+	cc, err := StartClient("test6", nil)
 	if err != nil {
 		t.Error(err)
 	}
+
+	_, _, err3 := cc.Read()
+	if err3.Error() != "server has sent a different version number" {
+		t.Error("Should have  wrong version number")
+	}
+
+}
+
+//
+func TestServerSendWrongEncryption(t *testing.T) {
+
+	config := &ServerConfig{Encryption: false}
+
+	sc, err := StartServer("test6", config)
+	if err != nil {
+		t.Error(err)
+	}
+
+	go func() {
+
+		_, _, err4 := sc.Read()
+		if err4.Error() != "client is enforcing encryption" {
+			t.Error("should have error because client is enforcing encryption")
+		}
+
+	}()
 
 	time.Sleep(time.Second / 4)
 
@@ -565,26 +630,10 @@ func TestServerWrongVersionNumber(t *testing.T) {
 		t.Error(err)
 	}
 
-	if checkStatus(sc, t) == false {
-		t.FailNow()
-	}
-
-	message := []byte("data")
-
-	cHeader := createHeader(2, 3, len(message))
-
-	write := append(cHeader, message...)
-
-	sc.conn.Write(write)
-
 	_, _, err3 := cc.Read()
-	if err3 == nil {
-		t.Error("Should have server sent wrong version number")
-	}
+	if err3.Error() != "server tried to connect without encryption" {
+		t.Error("should have error because client is enforcing encryption")
 
-	_, _, err4 := sc.Read()
-	if err4 == nil {
-		t.Error("Should have server sent wrong version number")
 	}
 
 }
@@ -771,6 +820,45 @@ func TestClientClose(t *testing.T) {
 	_, _, err4 := cc.Read()
 	if err4.Error() != "Connection closed" {
 		t.Error(err4)
+	}
+
+}
+
+func TestNoEncrytion(t *testing.T) {
+
+	config := &ServerConfig{Encryption: false}
+
+	sc, err := StartServer("test11", config)
+	if err != nil {
+		t.Error(err)
+	}
+
+	time.Sleep(time.Second / 4)
+
+	config2 := &ClientConfig{Encryption: false}
+
+	cc, err2 := StartClient("test11", config2)
+	if err2 != nil {
+		t.Error(err)
+	}
+
+	status := checkStatus(sc, t)
+	if status == false {
+		t.Error("Should have connected")
+	}
+
+	sc.Write(2, []byte("Message to client"))
+
+	cc.Write(2, []byte("Message to server"))
+
+	_, _, err4 := sc.Read()
+	if err4 != nil {
+		t.Error(err)
+	}
+
+	_, _, err5 := cc.Read()
+	if err5 != nil {
+		t.Error(err)
 	}
 
 }

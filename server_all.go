@@ -1,6 +1,7 @@
 package ipc
 
 import (
+	"bufio"
 	"errors"
 	"time"
 )
@@ -20,12 +21,13 @@ func StartServer(ipcName string, config *ServerConfig) (*Server, error) {
 	sc := &Server{
 		name:     ipcName,
 		status:   NotConnected,
-		recieved: make(chan Message),
+		recieved: make(chan *Message),
 	}
 
 	if config == nil {
 		sc.timeout = 0
 		sc.maxMsgSize = maxMsgSize
+		sc.encryption = true
 
 	} else {
 
@@ -40,6 +42,13 @@ func StartServer(ipcName string, config *ServerConfig) (*Server, error) {
 		} else {
 			sc.maxMsgSize = config.MaxMsgSize
 		}
+
+		if config.Encryption == false {
+			sc.encryption = false
+		} else {
+			sc.encryption = true
+		}
+
 	}
 
 	go startServer(sc)
@@ -51,7 +60,7 @@ func startServer(sc *Server) {
 
 	err := sc.run()
 	if err != nil {
-		sc.recieved <- Message{err: err, msgType: 0}
+		sc.recieved <- &Message{err: err, msgType: 0}
 	}
 }
 
@@ -63,10 +72,22 @@ func (sc *Server) acceptLoop() {
 		}
 
 		if sc.status == Listening || sc.status == ReConnecting {
+
 			sc.conn = conn
-			go sc.read()
-			sc.status = Connected
-			sc.connChannel <- true
+
+			err2 := sc.handshake()
+			if err2 != nil {
+				sc.recieved <- &Message{err: err2, msgType: 0}
+				sc.status = Error
+				sc.listen.Close()
+				sc.conn.Close()
+
+			} else {
+				go sc.read()
+				sc.status = Connected
+				sc.connChannel <- true
+			}
+
 		}
 
 	}
@@ -104,45 +125,34 @@ func (sc *Server) connectionTimer() error {
 
 func (sc *Server) read() {
 
-	header := make([]byte, 9)
-	buff := make([]byte, sc.maxMsgSize)
+	bLen := make([]byte, 4)
 
 	for {
 
-		result := sc.readData(header)
-		if result == false {
+		res := sc.readData(bLen)
+		if res == false {
 			break
 		}
 
-		ph := processHeader(header)
+		mLen := bytesToInt(bLen)
 
-		if ph.msgType == 0 {
+		msgRecvd := make([]byte, mLen)
 
-			result := sc.readData(buff[:ph.msgLen])
-			if result == false {
+		res = sc.readData(msgRecvd)
+		if res == false {
+			break
+		}
+
+		if sc.encryption == true {
+			msgFinal, err := decrypt(*sc.enc.cipher, msgRecvd)
+			if err != nil {
 				break
 			}
 
-			sc.msgTypeZero(buff[:ph.msgLen])
+			sc.recieved <- &Message{data: msgFinal[4:], msgType: bytesToInt(msgFinal[:4])}
 
 		} else {
-
-			if ph.version != version {
-				sc.writeControlMessage("WV")
-				sc.status = Error
-				sc.listen.Close()
-				sc.conn.Close()
-				sc.recieved <- Message{err: errors.New("Client sent the wrong version number"), msgType: 0}
-				break
-			}
-
-			result := sc.readData(buff[:ph.msgLen])
-			if result == false {
-				break
-			}
-
-			sc.recieved <- Message{data: buff[:ph.msgLen], msgType: ph.msgType}
-
+			sc.recieved <- &Message{data: msgRecvd[4:], msgType: bytesToInt(msgRecvd[:4])}
 		}
 
 	}
@@ -154,7 +164,7 @@ func (sc *Server) readData(buff []byte) bool {
 	if err != nil {
 
 		if sc.status == Closing {
-			sc.recieved <- Message{err: errors.New("Connection closed"), msgType: 0}
+			sc.recieved <- &Message{err: errors.New("Connection closed"), msgType: 0}
 			sc.status = Closed
 			close(sc.recieved)
 			return false
@@ -166,27 +176,18 @@ func (sc *Server) readData(buff []byte) bool {
 
 	}
 
+	//if sc.encryption == true {
+	//	retbuff, err := decrypt(sc.gcm, buff)
+	//	if err != nil {
+	//		log.Println(err)
+	//	}
+
+	//	buff = retbuff
+
+	//}
+
 	return true
 
-}
-
-func (sc *Server) msgTypeZero(buf []byte) {
-
-	// Wrong version error.
-	if string(buf) == "WV" {
-		sc.recieved <- Message{err: errors.New("Client recieved wrong version number"), msgType: 0}
-	}
-
-}
-
-func (sc *Server) writeControlMessage(mess string) {
-
-	message := []byte(mess)
-
-	header := createHeader(version, 0, len(message))
-	header = append(header, message...)
-
-	_, _ = sc.conn.Write(header)
 }
 
 func (sc *Server) reConnect() {
@@ -194,7 +195,7 @@ func (sc *Server) reConnect() {
 	err := sc.connectionTimer()
 	if err != nil {
 		sc.status = Error
-		sc.recieved <- Message{err: errors.New("Timed out trying to re-connect"), msgType: 0}
+		sc.recieved <- &Message{err: errors.New("Timed out trying to re-connect"), msgType: 0}
 		close(sc.recieved)
 
 	}
@@ -202,7 +203,7 @@ func (sc *Server) reConnect() {
 
 // Read - blocking function that waits until an non multipart message is recieved
 
-func (sc *Server) Read() (uint32, []byte, error) {
+func (sc *Server) Read() (int, []byte, error) {
 
 	m, ok := (<-sc.recieved)
 	if ok == false {
@@ -216,7 +217,7 @@ func (sc *Server) Read() (uint32, []byte, error) {
 // Write - writes a non multipart message to the ipc connection.
 // msgType - denotes the type of data being sent. 0 is a reserved type for internal messages and errors.
 //
-func (sc *Server) Write(msgType uint32, message []byte) error {
+func (sc *Server) Write(msgType int, message []byte) error {
 
 	if msgType == 0 {
 		return errors.New("Message type 0 is reserved")
@@ -230,11 +231,27 @@ func (sc *Server) Write(msgType uint32, message []byte) error {
 
 	if sc.status == Connected {
 
-		header := createHeader(version, msgType, mlen)
-		header = append(header, message...)
+		toSend := intToBytes(msgType)
 
-		_, err := sc.conn.Write(header)
+		writer := bufio.NewWriter(sc.conn)
 
+		if sc.encryption == true {
+			toSend = append(toSend, message...)
+			toSendEnc, err := encrypt(*sc.enc.cipher, toSend)
+			if err != nil {
+				return err
+			}
+			toSend = toSendEnc
+		} else {
+
+			toSend = append(toSend, message...)
+
+		}
+
+		writer.Write(intToBytes(len(toSend)))
+		writer.Write(toSend)
+
+		err := writer.Flush()
 		if err != nil {
 			return err
 		}

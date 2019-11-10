@@ -65,6 +65,12 @@ func (cc *Client) dial() error {
 		} else {
 
 			cc.conn = pn
+
+			err2 := cc.handshake()
+			if err2 != nil {
+				cc.recieved <- Message{err: err2, msgType: 0}
+			}
+
 			return nil
 		}
 

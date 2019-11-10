@@ -1,6 +1,7 @@
 package ipc
 
 import (
+	"bufio"
 	"errors"
 	"strings"
 	"time"
@@ -23,14 +24,14 @@ func StartClient(ipcName string, config *ClientConfig) (*Client, error) {
 	cc := &Client{
 		Name:     ipcName,
 		status:   NotConnected,
-		recieved: make(chan Message),
+		recieved: make(chan *Message),
 	}
 
 	if config == nil {
 
 		cc.timeout = 0
-		cc.retryTimer = time.Duration(2)
-		cc.maxMsgSize = maxMsgSize
+		cc.retryTimer = time.Duration(1)
+		cc.encryptionReq = true
 
 	} else {
 
@@ -41,15 +42,15 @@ func StartClient(ipcName string, config *ClientConfig) (*Client, error) {
 		}
 
 		if config.RetryTimer < 1 {
-			cc.retryTimer = time.Duration(2)
+			cc.retryTimer = time.Duration(1)
 		} else {
 			cc.retryTimer = time.Duration(config.RetryTimer)
 		}
 
-		if config.MaxMsgSize < 1024 {
-			cc.maxMsgSize = maxMsgSize
+		if config.Encryption == false {
+			cc.encryptionReq = false
 		} else {
-			cc.maxMsgSize = config.MaxMsgSize
+			cc.encryptionReq = true // defualt is to always enforce encryption
 		}
 	}
 
@@ -65,7 +66,7 @@ func startClient(cc *Client) {
 
 	err := cc.dial()
 	if err != nil {
-		cc.recieved <- Message{err: err, msgType: 0}
+		cc.recieved <- &Message{err: err, msgType: 0}
 		return
 	}
 
@@ -76,43 +77,36 @@ func startClient(cc *Client) {
 }
 
 func (cc *Client) read() {
+	bLen := make([]byte, 4)
 
-	header := make([]byte, 9)
-	buff := make([]byte, cc.maxMsgSize)
 	for {
 
-		res := cc.readData(header)
+		res := cc.readData(bLen)
 		if res == false {
 			break
 		}
 
-		ph := processHeader(header)
+		mLen := bytesToInt(bLen)
 
-		if ph.msgType == 0 {
+		msgRecvd := make([]byte, mLen)
 
-			res := cc.readData(buff[:ph.msgLen])
-			if res == false {
+		res = cc.readData(msgRecvd)
+		if res == false {
+			break
+		}
+
+		if cc.encryption == true {
+			msgFinal, err := decrypt(*cc.enc.cipher, msgRecvd)
+			if err != nil {
 				break
 			}
-			cc.msgTypeZero(buff[:ph.msgLen])
+
+			cc.recieved <- &Message{data: msgFinal[4:], msgType: bytesToInt(msgFinal[:4])}
 
 		} else {
-
-			if ph.version != version {
-				cc.writeControlMessage("WV")
-				cc.conn.Close()
-				cc.recieved <- Message{err: errors.New("Server sent the wrong version number"), msgType: 0}
-				break
-			}
-
-			res := cc.readData(buff[:ph.msgLen])
-			if res == false {
-				break
-			}
-
-			cc.recieved <- Message{data: buff[:ph.msgLen], msgType: ph.msgType}
-
+			cc.recieved <- &Message{data: msgRecvd[4:], msgType: bytesToInt(msgRecvd[:4])}
 		}
+
 	}
 }
 
@@ -132,7 +126,7 @@ func (cc *Client) readData(buff []byte) bool {
 		}
 
 		if cc.status == Closing {
-			cc.recieved <- Message{err: errors.New("Connection closed"), msgType: 0}
+			cc.recieved <- &Message{err: errors.New("Connection closed"), msgType: 0}
 		}
 
 		cc.status = Closed
@@ -145,24 +139,6 @@ func (cc *Client) readData(buff []byte) bool {
 
 }
 
-func (cc *Client) msgTypeZero(buf []byte) {
-
-	// Wrong version error.
-	if string(buf) == "WV" {
-		cc.recieved <- Message{err: errors.New("Server recieved wrong version number"), msgType: 0}
-	}
-
-}
-
-func (cc *Client) writeControlMessage(mess string) {
-
-	message := []byte(mess)
-
-	header := createHeader(version, 0, len(message))
-	header = append(header, message...)
-	_, _ = cc.conn.Write(header)
-}
-
 func (cc *Client) reconnect() {
 
 	cc.status = ReConnecting
@@ -170,7 +146,7 @@ func (cc *Client) reconnect() {
 	err := cc.dial() // connect to the pipe
 	if err != nil {
 		if err.Error() == "Timed out trying to connect" {
-			cc.recieved <- Message{err: errors.New("Timed out trying to re-connect"), msgType: 0}
+			cc.recieved <- &Message{err: errors.New("Timed out trying to re-connect"), msgType: 0}
 		}
 		close(cc.recieved)
 		return
@@ -185,7 +161,7 @@ func (cc *Client) reconnect() {
 // Read - blocking function that waits until an non multipart message is recieved
 // returns the message type, data and any error.
 //
-func (cc *Client) Read() (uint32, []byte, error) {
+func (cc *Client) Read() (int, []byte, error) {
 
 	m, ok := (<-cc.recieved)
 	if ok == false {
@@ -199,7 +175,7 @@ func (cc *Client) Read() (uint32, []byte, error) {
 // Write - writes a non multipart message to the ipc connection.
 // msgType - denotes the type of data being sent. 0 is a reserved type for internal messages and errors.
 //
-func (cc *Client) Write(msgType uint32, message []byte) error {
+func (cc *Client) Write(msgType int, message []byte) error {
 
 	if msgType == 0 {
 		return errors.New("Message type 0 is reserved")
@@ -213,17 +189,37 @@ func (cc *Client) Write(msgType uint32, message []byte) error {
 
 	if cc.status == Connected {
 
-		header := createHeader(version, msgType, mlen)
-		header = append(header, message...)
+		toSend := intToBytes(msgType)
 
-		_, _ = cc.conn.Write(header)
+		writer := bufio.NewWriter(cc.conn)
+
+		if cc.encryption == true {
+			toSend = append(toSend, message...)
+			toSendEnc, err := encrypt(*cc.enc.cipher, toSend)
+			if err != nil {
+				return err
+			}
+			toSend = toSendEnc
+		} else {
+
+			toSend = append(toSend, message...)
+
+		}
+
+		writer.Write(intToBytes(len(toSend)))
+		writer.Write(toSend)
+
+		err := writer.Flush()
+		if err != nil {
+			return err
+		}
 
 	} else {
-
 		return errors.New(cc.status.statusString())
 	}
 
 	return nil
+
 }
 
 // getStatus - get the current status of the connection
