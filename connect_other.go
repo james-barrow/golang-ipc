@@ -73,9 +73,9 @@ func (cc *Client) dial() error {
 
 			cc.conn = conn
 
-			err2 := cc.handshake()
-			if err2 != nil {
-				return err2
+			err = cc.handshake()
+			if err != nil {
+				return err
 			}
 
 			return nil
