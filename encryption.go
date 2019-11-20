@@ -9,59 +9,8 @@ import (
 	"crypto/sha256"
 	"errors"
 	"io"
-	"log"
 	"net"
 )
-
-//Enc -
-func Enc() {
-
-	//priva, _ := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
-	//puba := priva.PublicKey
-
-	//privb, _ := ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
-	//pubb := privb.PublicKey
-
-	//fmt.Printf("\nPrivate key (Alice) %x", priva.D)
-	//fmt.Printf("\nPublic key (Alice) (%x,%x)", puba.X, puba.Y)
-
-	//fmt.Printf("\nPrivate key (Bob) %x", privb.D)
-	//fmt.Printf("\nPublic key (Bob) (%x,%x)\n", pubb.X, pubb.Y)
-
-	//fmt.Sprintf("%x", pubb.X)
-
-	//fmt.Println(len(fmt.Sprintf("%x", pubb.X)))
-
-	//a, _ := puba.Curve.ScalarMult(puba.X, puba.Y, privb.D.Bytes())
-
-	//b, _ := pubb.Curve.ScalarMult(pubb.X, pubb.Y, priva.D.Bytes())
-
-	//shared1 := sha256.Sum256(a.Bytes())
-	//shared2 := sha256.Sum256(b.Bytes())
-
-	//fmt.Printf("\nShared key (Alice) %x", shared1)
-	///fmt.Printf("\nShared key  (Bob)  %x\n", shared2)
-
-	_, pub, err := generateKeys()
-	if err != nil {
-		log.Println("KEY GEN ERROR : " + err.Error())
-	}
-
-	pubSend := publicKeyToBytes(pub)
-
-	recvdPub := bytesToPublicKey(pubSend)
-
-	if recvdPub == nil {
-		log.Println("got nil bytes : ")
-	}
-
-	if recvdPub.IsOnCurve(recvdPub.X, recvdPub.Y) == false {
-		log.Println("Cleint KEY not on curve")
-	} else {
-		log.Println("goodGOOOOooD")
-	}
-
-}
 
 func (sc *Server) keyExchange() ([32]byte, error) {
 
@@ -160,6 +109,10 @@ func recvPublic(conn net.Conn) (*ecdsa.PublicKey, error) {
 		return nil, errors.New("didn't recieve public key")
 	}
 
+	if i != 97 {
+		return nil, errors.New("public key recieved isn't valid length")
+	}
+
 	recvdPub := bytesToPublicKey(buff[:i])
 
 	if recvdPub.IsOnCurve(recvdPub.X, recvdPub.Y) == false {
@@ -188,26 +141,6 @@ func bytesToPublicKey(recvdPub []byte) *ecdsa.PublicKey {
 	return &ecdsa.PublicKey{Curve: elliptic.P384(), X: x, Y: y}
 
 }
-
-/*
-func hexToPublicKey(xHex string, yHex string) *ecdsa.PublicKey {
-	xBytes, _ := hex.DecodeString(xHex)
-	x := new(big.Int)
-	x.SetBytes(xBytes)
-
-	yBytes, _ := hex.DecodeString(yHex)
-	y := new(big.Int)
-	y.SetBytes(yBytes)
-
-	pub := new(ecdsa.PublicKey)
-	pub.X = x
-	pub.Y = y
-
-	pub.Curve = elliptic.P384()
-
-	return pub
-}
-*/
 
 func createCipher(shared [32]byte) (*cipher.AEAD, error) {
 
@@ -242,7 +175,6 @@ func decrypt(g cipher.AEAD, recdData []byte) ([]byte, error) {
 	nonceSize := g.NonceSize()
 	if len(recdData) < nonceSize {
 		return nil, errors.New("not enough data to decrypt")
-
 	}
 
 	nonce, recdData := recdData[:nonceSize], recdData[nonceSize:]

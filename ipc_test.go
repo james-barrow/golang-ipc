@@ -551,6 +551,7 @@ func TestServerSendWrongVersionNumber(t *testing.T) {
 	}
 }
 
+// This test will not pass on Windows unless the net.Listen part for unix sockets is replaced with winio.ListenPipe
 func TestServerWrongVersionNumber(t *testing.T) {
 
 	sc := &Server{
@@ -561,6 +562,16 @@ func TestServerWrongVersionNumber(t *testing.T) {
 
 	go func() {
 
+		//var pipeBase = `\\.\pipe\`
+
+		//listen, err := winio.ListenPipe(pipeBase+sc.name, nil)
+		//if err != nil {
+
+		//	return err
+		//}
+
+		//sc.listen = listen
+
 		base := "/tmp/"
 		sock := ".sock"
 
@@ -569,7 +580,6 @@ func TestServerWrongVersionNumber(t *testing.T) {
 		sc.listen, _ = net.Listen("unix", base+sc.name+sock)
 
 		conn, _ := sc.listen.Accept()
-
 		sc.conn = conn
 
 		buff := make([]byte, 2)
@@ -604,7 +614,6 @@ func TestServerWrongVersionNumber(t *testing.T) {
 
 }
 
-//
 func TestServerSendWrongEncryption(t *testing.T) {
 
 	config := &ServerConfig{Encryption: false}

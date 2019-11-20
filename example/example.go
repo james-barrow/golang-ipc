@@ -15,8 +15,6 @@ func main() {
 
 	client()
 
-	//ipc.Enc()
-
 }
 
 func server() {

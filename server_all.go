@@ -146,7 +146,8 @@ func (sc *Server) read() {
 		if sc.encryption == true {
 			msgFinal, err := decrypt(*sc.enc.cipher, msgRecvd)
 			if err != nil {
-				break
+				sc.recieved <- &Message{err: err, msgType: 0}
+				continue
 			}
 
 			sc.recieved <- &Message{data: msgFinal[4:], msgType: bytesToInt(msgFinal[:4])}
