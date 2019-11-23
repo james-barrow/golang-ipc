@@ -73,7 +73,7 @@ Read and write data to the connection:
 
  By default the connection established will be encypted, ECDH384 is used for the key exchange and AES 256 GCM is used for the cipher.
 
- Encryption can be swithed off by passing in a custom configuation to the server/client start functions.
+ Encryption can be swithed off by passing in a custom configuation to the server & client start functions.
 
 ```go
     
