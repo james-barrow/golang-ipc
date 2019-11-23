@@ -69,6 +69,19 @@ Read and write data to the connection:
 
 ```
 
+ ### Encryption
+
+ By default the connection established will be encypted, ECDH384 is used for the key exchange and AES 256 GCM is used for the cipher.
+
+ Encryption can be swithed off by passing in a custom configuation to the server/client start functions.
+
+```go
+    
+    config := &ipc.ServerConfig{Encryption: false}
+	sc, err := ipc.StartServer("<name of socket or pipe>", config)
+
+```
+
  ### Testing
 
  The package has been tested on Mac, Windows and Linux and has extensive test coverage.
