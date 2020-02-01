@@ -14,6 +14,7 @@ type Server struct {
 	status      Status
 	recieved    chan (*Message)
 	connChannel chan bool
+	toWrite     chan (*Message)
 	timeout     time.Duration
 	encryption  bool
 	maxMsgSize  int
@@ -28,6 +29,7 @@ type Client struct {
 	timeout       float64       //
 	retryTimer    time.Duration // number of seconds before trying to connect again
 	recieved      chan (*Message)
+	toWrite       chan (*Message)
 	encryption    bool
 	encryptionReq bool
 	maxMsgSize    int
@@ -36,11 +38,10 @@ type Client struct {
 
 // Message - contains the  recieved message
 type Message struct {
-	version byte   // version of the ipc protocal
 	err     error  // details of any error
-	msgType int    // type of message sent - 0 is reserved
-	msgLen  int    // length of the message recieved
-	data    []byte // message data recieved
+	MsgType int    // type of message sent - 0 is reserved
+	Data    []byte // message data recieved
+	Status  string
 }
 
 // Status - Status of the connection
@@ -64,6 +65,8 @@ const (
 	Closing Status = iota
 	// Error - 7
 	Error Status = iota
+	// Timeout - 8
+	Timeout Status = iota
 )
 
 // ServerConfig - used to pass configuation overrides to ServerStart()

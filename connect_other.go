@@ -28,7 +28,7 @@ func (sc *Server) run() error {
 	sc.listen = listen
 
 	sc.status = Listening
-
+	sc.recieved <- &Message{Status: sc.status.String(), MsgType: -1}
 	sc.connChannel = make(chan bool)
 
 	go sc.acceptLoop()
@@ -66,7 +66,7 @@ func (cc *Client) dial() error {
 			} else if strings.Contains(err.Error(), "connect: connection refused") == true {
 
 			} else {
-				cc.recieved <- &Message{err: err, msgType: 0}
+				cc.recieved <- &Message{err: err, MsgType: -2}
 			}
 
 		} else {
