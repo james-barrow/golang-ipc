@@ -11,9 +11,9 @@ func main() {
 
 	log.Println("starting")
 
-	server()
+	go server()
 
-	//client()
+	client()
 
 }
 

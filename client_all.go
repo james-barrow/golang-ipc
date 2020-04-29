@@ -61,6 +61,9 @@ func StartClient(ipcName string, config *ClientConfig) (*Client, error) {
 
 }
 
+
+
+
 func startClient(cc *Client) {
 
 	cc.status = Connecting
@@ -203,19 +206,16 @@ func (cc *Client) Write(msgType int, message []byte) error {
 		return errors.New("Message type 0 is reserved")
 	}
 
-	mlen := len(message)
+	if cc.status == Connected {
+		return errors.New(cc.status.String())
+	}
 
+	mlen := len(message)
 	if mlen > cc.maxMsgSize {
 		return errors.New("Message exceeds maximum message length")
 	}
 
-	if cc.status == Connected {
-
-		cc.toWrite <- &Message{MsgType: msgType, Data: message}
-
-	} else {
-		return errors.New(cc.status.String())
-	}
+	cc.toWrite <- &Message{MsgType: msgType, Data: message}
 
 	return nil
 
