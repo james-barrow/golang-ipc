@@ -290,6 +290,8 @@ func (sc *Server) write() {
 			//return err
 		}
 
+		time.Sleep(2 * time.Millisecond)
+
 	}
 
 }

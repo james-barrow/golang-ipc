@@ -61,9 +61,6 @@ func StartClient(ipcName string, config *ClientConfig) (*Client, error) {
 
 }
 
-
-
-
 func startClient(cc *Client) {
 
 	cc.status = Connecting
@@ -206,7 +203,7 @@ func (cc *Client) Write(msgType int, message []byte) error {
 		return errors.New("Message type 0 is reserved")
 	}
 
-	if cc.status == Connected {
+	if cc.status != Connected {
 		return errors.New(cc.status.String())
 	}
 
