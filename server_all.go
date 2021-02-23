@@ -303,6 +303,11 @@ func (sc *Server) getStatus() Status {
 
 }
 
+// StatusCode - returns the current connection status
+func (sc *Server) StatusCode() Status {
+	return sc.status
+}
+
 // Status - returns the current connection status as a string
 func (sc *Server) Status() string {
 
