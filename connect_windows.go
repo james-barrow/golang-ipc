@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/microsoft/go-winio-master"
+	"github.com/Microsoft/go-winio"
 )
 
 // Server function

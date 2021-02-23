@@ -4,7 +4,7 @@ import (
 	"log"
 	"time"
 
-	ipc "../../golang-ipc"
+	ipc "golang-ipc"
 )
 
 func main() {
