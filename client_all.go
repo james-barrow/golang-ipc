@@ -263,6 +263,11 @@ func (cc *Client) getStatus() Status {
 
 }
 
+// StatusCode - returns the current connection status
+func (cc *Client) StatusCode() Status {
+	return cc.status
+}
+
 // Status - returns the current connection status as a string
 func (cc *Client) Status() string {
 
