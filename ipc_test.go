@@ -71,6 +71,35 @@ func TestStartUp_Configs(t *testing.T) {
 	if err8 != nil {
 		t.Error(err)
 	}
+
+	t.Run("Unmask Server Socket Permissions", func(t *testing.T) {
+		scon.UnmaskPermissions = true
+
+		_, err := StartServer("test_perm", scon)
+		if err != nil {
+			t.Error(err)
+		}
+
+		// test would not work in windows
+		// can check test_perm.sock in /tmp after running tests to see perms
+
+		/*
+			time.Sleep(time.Second / 4)
+
+			info, err := os.Stat(srv.listen.Addr().String())
+			if err != nil {
+				t.Error(err)
+			}
+			got := fmt.Sprintf("%04o", info.Mode().Perm())
+			want := "0777"
+
+			if got != want {
+				t.Errorf("Got %q, Wanted %q", got, want)
+			}
+		*/
+		scon.UnmaskPermissions = false
+	})
+
 }
 func TestStartUp_Timeout(t *testing.T) {
 

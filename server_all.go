@@ -29,6 +29,7 @@ func StartServer(ipcName string, config *ServerConfig) (*Server, error) {
 		sc.timeout = 0
 		sc.maxMsgSize = maxMsgSize
 		sc.encryption = true
+		sc.unMask = false
 
 	} else {
 
@@ -50,6 +51,11 @@ func StartServer(ipcName string, config *ServerConfig) (*Server, error) {
 			sc.encryption = true
 		}
 
+		if config.UnmaskPermissions == true {
+			sc.unMask = true
+		} else {
+			sc.unMask = false
+		}
 	}
 
 	go startServer(sc)
