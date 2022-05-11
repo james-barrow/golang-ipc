@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -20,7 +21,17 @@ func (sc *Server) run() error {
 		return err
 	}
 
+	var oldUmask int
+	if sc.unMask == true {
+		oldUmask = syscall.Umask(0)
+	}
+
 	listen, err := net.Listen("unix", base+sc.name+sock)
+
+	if sc.unMask == true {
+		syscall.Umask(oldUmask)
+	}
+
 	if err != nil {
 		return err
 	}

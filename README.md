@@ -82,6 +82,22 @@ Read and write data to the connection:
 
 ```
 
+ ### Unix Socket Permissions
+
+ Under most configurations, a socket created by a user will by default not be writable by another user, making it impossible for the client and server to communicate if being run by separate users.
+
+ The permission mask can be dropped during socket creation by passing custom configuration to the server start function.  **This will make the socket writable by any user.**
+
+```go
+
+	config := &ipc.ServerConfig{UnmaskPermissions: true}
+	sc, err := ipc.StartServer("<name of socket or pipe>", config)
+
+```
+ Note: Tested on Linux, not tested on Mac, not implemented on Windows.
+ 
+
+
  ### Testing
 
  The package has been tested on Mac, Windows and Linux and has extensive test coverage.

@@ -19,6 +19,7 @@ type Server struct {
 	encryption  bool
 	maxMsgSize  int
 	enc         *encryption
+	unMask      bool
 }
 
 // Client - holds the details of the client connection and config.
@@ -71,9 +72,10 @@ const (
 
 // ServerConfig - used to pass configuation overrides to ServerStart()
 type ServerConfig struct {
-	Timeout    time.Duration
-	MaxMsgSize int
-	Encryption bool
+	Timeout           time.Duration
+	MaxMsgSize        int
+	Encryption        bool
+	UnmaskPermissions bool
 }
 
 // ClientConfig - used to pass configuation overrides to ClientStart()
