@@ -6,6 +6,20 @@
  
  A simple to use package that uses unix sockets on Macos/Linux and named pipes on Windows to create a communication channel between two go processes.
 
+### Intergration
+
+As well as using this library just for go processes it was also designed to work with other languages, with the go process as the server and the other languages processing being the client.
+
+
+#### NodeJs
+
+I currently use this library to comunicate between a ElectronJs GUI and a go program.
+
+https://github.com/james-barrow/node-ipc-client
+
+#### Python 
+
+To do
 
 ## Usage
 
