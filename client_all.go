@@ -3,6 +3,7 @@ package ipc
 import (
 	"bufio"
 	"errors"
+	"io"
 	"strings"
 	"time"
 )
@@ -124,7 +125,7 @@ func (cc *Client) read() {
 
 func (cc *Client) readData(buff []byte) bool {
 
-	_, err := cc.conn.Read(buff)
+	_, err := io.ReadFull(cc.conn, buff)
 	if err != nil {
 		if strings.Contains(err.Error(), "EOF") { // the connection has been closed by the client.
 			cc.conn.Close()
