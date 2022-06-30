@@ -3,6 +3,7 @@ package ipc
 import (
 	"bufio"
 	"errors"
+	"io"
 	"time"
 )
 
@@ -179,7 +180,7 @@ func (sc *Server) read() {
 
 func (sc *Server) readData(buff []byte) bool {
 
-	_, err := sc.conn.Read(buff)
+	_, err := io.ReadFull(sc.conn, buff)
 	if err != nil {
 
 		if sc.status == Closing {

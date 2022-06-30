@@ -3,6 +3,7 @@ package ipc
 import (
 	"bufio"
 	"errors"
+	"io"
 	"strings"
 	"time"
 )
@@ -124,7 +125,7 @@ func (cc *Client) read() {
 
 func (cc *Client) readData(buff []byte) bool {
 
-	_, err := cc.conn.Read(buff)
+	_, err := io.ReadFull(cc.conn, buff)
 	if err != nil {
 		if strings.Contains(err.Error(), "EOF") { // the connection has been closed by the client.
 			cc.conn.Close()
@@ -156,15 +157,19 @@ func (cc *Client) reconnect() {
 	cc.status = ReConnecting
 	cc.recieved <- &Message{Status: cc.status.String(), MsgType: -1}
 
-	err := cc.dial() // connect to the pipe
-	if err != nil {
-		if err.Error() == "Timed out trying to connect" {
-			cc.status = Timeout
-			cc.recieved <- &Message{Status: cc.status.String(), MsgType: -1}
-			cc.recieved <- &Message{err: errors.New("Timed out trying to re-connect"), MsgType: -2}
+loop:
+	for {
+		err := cc.dial() // connect to the pipe
+		if err != nil {
+			if err.Error() == "Timed out trying to connect" {
+				cc.status = Timeout
+				cc.recieved <- &Message{Status: cc.status.String(), MsgType: -1}
+				cc.recieved <- &Message{err: errors.New("Timed out trying to re-connect"), MsgType: -2}
+			}
+		} else {
+			break loop
 		}
-
-		return
+		time.Sleep(time.Second * 5) //sleep for 5 sec
 	}
 
 	cc.status = Connected
