@@ -78,7 +78,7 @@ func generateKeys() (*ecdsa.PrivateKey, *ecdsa.PublicKey, error) {
 
 	puba := &priva.PublicKey
 
-	if priva.IsOnCurve(puba.X, puba.Y) == false {
+	if !priva.IsOnCurve(puba.X, puba.Y) {
 		return nil, nil, errors.New("keys created arn't on curve")
 	}
 
@@ -115,7 +115,7 @@ func recvPublic(conn net.Conn) (*ecdsa.PublicKey, error) {
 
 	recvdPub := bytesToPublicKey(buff[:i])
 
-	if recvdPub.IsOnCurve(recvdPub.X, recvdPub.Y) == false {
+	if !recvdPub.IsOnCurve(recvdPub.X, recvdPub.Y) {
 		return nil, errors.New("didn't recieve valid public key")
 	}
 

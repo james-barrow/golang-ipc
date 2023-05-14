@@ -3,6 +3,7 @@ package ipc
 import (
 	"bufio"
 	"errors"
+	"io"
 	"time"
 )
 
@@ -10,7 +11,6 @@ import (
 //
 // ipcName = is the name of the unix socket or named pipe that will be created.
 // timeout = number of seconds before the socket/pipe times out waiting for a connection/re-cconnection - if -1 or 0 it never times out.
-//
 func StartServer(ipcName string, config *ServerConfig) (*Server, error) {
 
 	err := checkIpcName(ipcName)
@@ -45,13 +45,13 @@ func StartServer(ipcName string, config *ServerConfig) (*Server, error) {
 			sc.maxMsgSize = config.MaxMsgSize
 		}
 
-		if config.Encryption == false {
+		if !config.Encryption {
 			sc.encryption = false
 		} else {
 			sc.encryption = true
 		}
 
-		if config.UnmaskPermissions == true {
+		if config.UnmaskPermissions {
 			sc.unMask = true
 		} else {
 			sc.unMask = false
@@ -121,15 +121,18 @@ func (sc *Server) connectionTimer() error {
 			return nil
 		case <-timeout:
 			sc.listen.Close()
-			return errors.New("Timed out waiting for client to connect")
+			return errors.New("timed out waiting for client to connect")
 		}
 	}
 
-	select {
+	//select {
 
-	case <-sc.connChannel:
-		return nil
-	}
+	//case <-sc.connChannel:
+	//	return nil
+	//}
+
+	<-sc.connChannel
+	return nil
 
 }
 
@@ -140,7 +143,7 @@ func (sc *Server) read() {
 	for {
 
 		res := sc.readData(bLen)
-		if res == false {
+		if !res {
 			break
 		}
 
@@ -149,11 +152,11 @@ func (sc *Server) read() {
 		msgRecvd := make([]byte, mLen)
 
 		res = sc.readData(msgRecvd)
-		if res == false {
+		if !res {
 			break
 		}
 
-		if sc.encryption == true {
+		if sc.encryption {
 			msgFinal, err := decrypt(*sc.enc.cipher, msgRecvd)
 			if err != nil {
 				sc.recieved <- &Message{err: err, MsgType: -2}
@@ -179,7 +182,8 @@ func (sc *Server) read() {
 
 func (sc *Server) readData(buff []byte) bool {
 
-	_, err := sc.conn.Read(buff)
+	_, err := io.ReadFull(sc.conn, buff)
+	//_, err := sc.conn.Read(buff)
 	if err != nil {
 
 		if sc.status == Closing {
@@ -220,7 +224,7 @@ func (sc *Server) reConnect() {
 func (sc *Server) Read() (*Message, error) {
 
 	m, ok := (<-sc.recieved)
-	if ok == false {
+	if !ok {
 		return nil, errors.New("the recieve channel has been closed")
 	}
 
@@ -236,7 +240,6 @@ func (sc *Server) Read() (*Message, error) {
 
 // Write - writes a non multipart message to the ipc connection.
 // msgType - denotes the type of data being sent. 0 is a reserved type for internal messages and errors.
-//
 func (sc *Server) Write(msgType int, message []byte) error {
 
 	if msgType == 0 {
@@ -267,7 +270,7 @@ func (sc *Server) write() {
 
 		m, ok := <-sc.toWrite
 
-		if ok == false {
+		if !ok {
 			break
 		}
 
@@ -275,7 +278,7 @@ func (sc *Server) write() {
 
 		writer := bufio.NewWriter(sc.conn)
 
-		if sc.encryption == true {
+		if sc.encryption {
 			toSend = append(toSend, m.Data...)
 			toSendEnc, err := encrypt(*sc.enc.cipher, toSend)
 			if err != nil {
@@ -306,7 +309,6 @@ func (sc *Server) write() {
 func (sc *Server) getStatus() Status {
 
 	return sc.status
-
 }
 
 // StatusCode - returns the current connection status
@@ -318,14 +320,18 @@ func (sc *Server) StatusCode() Status {
 func (sc *Server) Status() string {
 
 	return sc.status.String()
-
 }
 
 // Close - closes the connection
 func (sc *Server) Close() {
 
 	sc.status = Closing
-	sc.listen.Close()
-	sc.conn.Close()
 
+	if sc.listen != nil {
+		sc.listen.Close()
+	}
+
+	if sc.conn != nil {
+		sc.conn.Close()
+	}
 }

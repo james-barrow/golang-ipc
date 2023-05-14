@@ -22,13 +22,13 @@ func (sc *Server) run() error {
 	}
 
 	var oldUmask int
-	if sc.unMask == true {
+	if sc.unMask {
 		oldUmask = syscall.Umask(0)
 	}
 
 	listen, err := net.Listen("unix", base+sc.name+sock)
 
-	if sc.unMask == true {
+	if sc.unMask {
 		syscall.Umask(oldUmask)
 	}
 
@@ -65,16 +65,16 @@ func (cc *Client) dial() error {
 		if cc.timeout != 0 {
 			if time.Now().Sub(startTime).Seconds() > cc.timeout {
 				cc.status = Closed
-				return errors.New("Timed out trying to connect")
+				return errors.New("timed out trying to connect")
 			}
 		}
 
 		conn, err := net.Dial("unix", base+cc.Name+sock)
 		if err != nil {
 
-			if strings.Contains(err.Error(), "connect: no such file or directory") == true {
+			if strings.Contains(err.Error(), "connect: no such file or directory") {
 
-			} else if strings.Contains(err.Error(), "connect: connection refused") == true {
+			} else if strings.Contains(err.Error(), "connect: connection refused") {
 
 			} else {
 				cc.recieved <- &Message{err: err, MsgType: -2}

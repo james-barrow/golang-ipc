@@ -3,6 +3,7 @@ package ipc
 import (
 	"bufio"
 	"errors"
+	"io"
 	"strings"
 	"time"
 )
@@ -12,7 +13,6 @@ import (
 // ipcName = is the name of the unix socket or named pipe that the client will try and connect to.
 // timeout = number of seconds before the socket/pipe times out trying to connect/re-cconnect - if -1 or 0 it never times out.
 // retryTimer = number of seconds before the client tries to connect again.
-//
 func StartClient(ipcName string, config *ClientConfig) (*Client, error) {
 
 	err := checkIpcName(ipcName)
@@ -48,7 +48,7 @@ func StartClient(ipcName string, config *ClientConfig) (*Client, error) {
 			cc.retryTimer = time.Duration(config.RetryTimer)
 		}
 
-		if config.Encryption == false {
+		if !config.Encryption {
 			cc.encryptionReq = false
 		} else {
 			cc.encryptionReq = true // defualt is to always enforce encryption
@@ -86,7 +86,7 @@ func (cc *Client) read() {
 	for {
 
 		res := cc.readData(bLen)
-		if res == false {
+		if !res {
 			break
 		}
 
@@ -95,11 +95,11 @@ func (cc *Client) read() {
 		msgRecvd := make([]byte, mLen)
 
 		res = cc.readData(msgRecvd)
-		if res == false {
+		if !res {
 			break
 		}
 
-		if cc.encryption == true {
+		if cc.encryption {
 			msgFinal, err := decrypt(*cc.enc.cipher, msgRecvd)
 			if err != nil {
 				break
@@ -124,7 +124,8 @@ func (cc *Client) read() {
 
 func (cc *Client) readData(buff []byte) bool {
 
-	_, err := cc.conn.Read(buff)
+	_, err := io.ReadFull(cc.conn, buff)
+	//_, err := cc.conn.Read(buff)
 	if err != nil {
 		if strings.Contains(err.Error(), "EOF") { // the connection has been closed by the client.
 			cc.conn.Close()
@@ -151,90 +152,85 @@ func (cc *Client) readData(buff []byte) bool {
 
 }
 
-func (cc *Client) reconnect() {
+func (c *Client) reconnect() {
 
-	cc.status = ReConnecting
-	cc.recieved <- &Message{Status: cc.status.String(), MsgType: -1}
+	c.status = ReConnecting
+	c.recieved <- &Message{Status: c.status.String(), MsgType: -1}
 
-	err := cc.dial() // connect to the pipe
+	err := c.dial() // connect to the pipe
 	if err != nil {
 		if err.Error() == "Timed out trying to connect" {
-			cc.status = Timeout
-			cc.recieved <- &Message{Status: cc.status.String(), MsgType: -1}
-			cc.recieved <- &Message{err: errors.New("Timed out trying to re-connect"), MsgType: -2}
+			c.status = Timeout
+			c.recieved <- &Message{Status: c.status.String(), MsgType: -1}
+			c.recieved <- &Message{err: errors.New("timed out trying to re-connect"), MsgType: -2}
 		}
 
 		return
 	}
 
-	cc.status = Connected
-	cc.recieved <- &Message{Status: cc.status.String(), MsgType: -1}
+	c.status = Connected
+	c.recieved <- &Message{Status: c.status.String(), MsgType: -1}
 
-	go cc.read()
-
+	go c.read()
 }
 
 // Read - blocking function that waits until an non multipart message is recieved
 // returns the message type, data and any error.
-//
-func (cc *Client) Read() (*Message, error) {
+func (c *Client) Read() (*Message, error) {
 
-	m, ok := (<-cc.recieved)
-	if ok == false {
+	m, ok := (<-c.recieved)
+	if !ok {
 		return nil, errors.New("the recieve channel has been closed")
 	}
 
 	if m.err != nil {
-		close(cc.recieved)
-		close(cc.toWrite)
+		close(c.recieved)
+		close(c.toWrite)
 		return nil, m.err
 	}
 
 	return m, nil
-
 }
 
 // Write - writes a non multipart message to the ipc connection.
 // msgType - denotes the type of data being sent. 0 is a reserved type for internal messages and errors.
-//
-func (cc *Client) Write(msgType int, message []byte) error {
+func (c *Client) Write(msgType int, message []byte) error {
 
 	if msgType == 0 {
 		return errors.New("Message type 0 is reserved")
 	}
 
-	if cc.status != Connected {
-		return errors.New(cc.status.String())
+	if c.status != Connected {
+		return errors.New(c.status.String())
 	}
 
 	mlen := len(message)
-	if mlen > cc.maxMsgSize {
+	if mlen > c.maxMsgSize {
 		return errors.New("Message exceeds maximum message length")
 	}
 
-	cc.toWrite <- &Message{MsgType: msgType, Data: message}
+	c.toWrite <- &Message{MsgType: msgType, Data: message}
 
 	return nil
-
 }
 
-func (cc *Client) write() {
+func (c *Client) write() {
 
 	for {
 
-		m, ok := <-cc.toWrite
+		m, ok := <-c.toWrite
 
-		if ok == false {
+		if !ok{
 			break
 		}
 
 		toSend := intToBytes(m.MsgType)
 
-		writer := bufio.NewWriter(cc.conn)
+		writer := bufio.NewWriter(c.conn)
 
-		if cc.encryption == true {
+		if c.encryption {
 			toSend = append(toSend, m.Data...)
-			toSendEnc, err := encrypt(*cc.enc.cipher, toSend)
+			toSendEnc, err := encrypt(*c.enc.cipher, toSend)
 			if err != nil {
 				//return err
 			}
@@ -257,27 +253,28 @@ func (cc *Client) write() {
 }
 
 // getStatus - get the current status of the connection
-func (cc *Client) getStatus() Status {
+func (c *Client) getStatus() Status {
 
-	return cc.status
-
+	return c.status
 }
 
 // StatusCode - returns the current connection status
-func (cc *Client) StatusCode() Status {
-	return cc.status
+func (c *Client) StatusCode() Status {
+	return c.status
 }
 
 // Status - returns the current connection status as a string
-func (cc *Client) Status() string {
+func (c *Client) Status() string {
 
-	return cc.status.String()
-
+	return c.status.String()
 }
 
 // Close - closes the connection
-func (cc *Client) Close() {
+func (c *Client) Close() {
 
-	cc.status = Closing
-	cc.conn.Close()
+	c.status = Closing
+
+	if c.conn != nil {
+		c.conn.Close()
+	}
 }
