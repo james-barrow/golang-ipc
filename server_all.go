@@ -216,7 +216,7 @@ func (s *Server) Read() (*Message, error) {
 
 	m, ok := (<-s.received)
 	if !ok {
-		return nil, errors.New("the recieve channel has been closed")
+		return nil, errors.New("the received channel has been closed")
 	}
 
 	if m.err != nil {

@@ -305,7 +305,7 @@ func TestRead(t *testing.T) {
 
 	cIPC.received <- &Message{MsgType: 1, Data: []byte("message 1")}
 	cIPC.received <- &Message{MsgType: 1, Data: []byte("message 1")}
-	close(cIPC.received) // close recieve channel
+	close(cIPC.received) // close received channel
 
 	<-clientFinished
 
@@ -1081,7 +1081,6 @@ func TestServerClose(t *testing.T) {
 			}
 
 			if mm.Status == "Closed" {
-				ready = true
 				break
 			}
 		}
@@ -1445,9 +1444,9 @@ func TestServerReadClose(t *testing.T) {
 			m, err3 := sc.Read()
 
 			if err3 != nil {
-				if err3.Error() == "the recieve channel has been closed" {
-					serverErrorTwo <- true // after the connection times out the recieve channel is closed, so we're now testing that the close error is returned.
-					// This is the only error the recieve function returns.
+				if err3.Error() == "the received channel has been closed" {
+					serverErrorTwo <- true // after the connection times out the received channel is closed, so we're now testing that the close error is returned.
+					// This is the only error the received function returns.
 					break
 				}
 			}
@@ -1519,9 +1518,9 @@ func TestClientReadClose(t *testing.T) {
 			m, err3 := cc.Read()
 
 			if err3 != nil {
-				if err3.Error() == "the recieve channel has been closed" {
-					clientError <- true // after the connection times out the recieve channel is closed, so we're now testing that the close error is returned.
-					// This is the only error the recieve function returns.
+				if err3.Error() == "the received channel has been closed" {
+					clientError <- true // after the connection times out the received channel is closed, so we're now testing that the close error is returned.
+					// This is the only error the received function returns.
 					break
 				}
 			}
@@ -1592,7 +1591,7 @@ func TestServerSendWrongVersionNumber(t *testing.T) {
 	recv := make([]byte, 2)
 	_, err2 := cc.conn.Read(recv)
 	if err2 != nil {
-		//return errors.New("failed to recieve handshake message")
+		//return errors.New("failed to received handshake message")
 	}
 
 	if recv[0] != 4 {

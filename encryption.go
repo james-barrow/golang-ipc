@@ -27,7 +27,7 @@ func (sc *Server) keyExchange() ([32]byte, error) {
 		return shared, err
 	}
 
-	// recieve clients public key
+	// received clients public key
 	pubRecvd, err := recvPublic(sc.conn)
 	if err != nil {
 		return shared, err
@@ -50,7 +50,7 @@ func (cc *Client) keyExchange() ([32]byte, error) {
 		return shared, err
 	}
 
-	// recieve servers public key
+	// received servers public key
 	pubRecvd, err := recvPublic(cc.conn)
 	if err != nil {
 		return shared, err
@@ -106,7 +106,7 @@ func recvPublic(conn net.Conn) (*ecdsa.PublicKey, error) {
 	buff := make([]byte, 300)
 	i, err := conn.Read(buff)
 	if err != nil {
-		return nil, errors.New("didn't recieve public key")
+		return nil, errors.New("didn't received public key")
 	}
 
 	if i != 97 {
@@ -116,7 +116,7 @@ func recvPublic(conn net.Conn) (*ecdsa.PublicKey, error) {
 	recvdPub := bytesToPublicKey(buff[:i])
 
 	if !recvdPub.IsOnCurve(recvdPub.X, recvdPub.Y) {
-		return nil, errors.New("didn't recieve valid public key")
+		return nil, errors.New("didn't received valid public key")
 	}
 
 	return recvdPub, nil

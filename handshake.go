@@ -52,7 +52,7 @@ func (sc *Server) one() error {
 	recv := make([]byte, 1)
 	_, err = sc.conn.Read(recv)
 	if err != nil {
-		return errors.New("failed to recieve handshake reply")
+		return errors.New("failed to received handshake reply")
 	}
 
 	switch result := recv[0]; result {
@@ -124,7 +124,7 @@ func (sc *Server) msgLength() error {
 
 	_, err = sc.conn.Read(reply)
 	if err != nil {
-		return errors.New("did not recieve message length reply")
+		return errors.New("did not received message length reply")
 	}
 
 	return nil
@@ -160,7 +160,7 @@ func (cc *Client) one() error {
 	recv := make([]byte, 2)
 	_, err := cc.conn.Read(recv)
 	if err != nil {
-		return errors.New("failed to recieve handshake message")
+		return errors.New("failed to received handshake message")
 	}
 
 	if recv[0] != version {
@@ -212,7 +212,7 @@ func (cc *Client) msgLength() error {
 
 	_, err := cc.conn.Read(buff)
 	if err != nil {
-		return errors.New("failed to recieve max message length 1")
+		return errors.New("failed to received max message length 1")
 	}
 
 	var msgLen uint32
@@ -222,13 +222,13 @@ func (cc *Client) msgLength() error {
 
 	_, err = cc.conn.Read(buff)
 	if err != nil {
-		return errors.New("failed to recieve max message length 2")
+		return errors.New("failed to received max message length 2")
 	}
 	var buff2 []byte
 	if cc.encryption {
 		buff2, err = decrypt(*cc.enc.cipher, buff)
 		if err != nil {
-			return errors.New("failed to recieve max message length 3")
+			return errors.New("failed to received max message length 3")
 		}
 
 	} else {

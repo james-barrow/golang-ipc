@@ -56,13 +56,9 @@ func serverSend(sc *ipc.Server) {
 
 	for {
 
-		err := sc.Write(3, []byte("Hello Client 4"))
-		err = sc.Write(23, []byte("Hello Client 5"))
-		err = sc.Write(65, []byte("Hello Client 6"))
-
-		if err != nil {
-			//fmt.Println(err)
-		}
+		sc.Write(3, []byte("Hello Client 4"))
+		sc.Write(23, []byte("Hello Client 5"))
+		sc.Write(65, []byte("Hello Client 6"))
 
 		time.Sleep(time.Second / 30)
 
@@ -87,13 +83,9 @@ func serverSend2(sc *ipc.Server) {
 
 	for {
 
-		err := sc.Write(88, []byte("Hello Client 7"))
-		err = sc.Write(99, []byte("Hello Client 8"))
-		err = sc.Write(22, []byte("Hello Client 9"))
-
-		if err != nil {
-			//fmt.Println(err)
-		}
+		sc.Write(88, []byte("Hello Client 7"))
+		sc.Write(99, []byte("Hello Client 8"))
+		sc.Write(22, []byte("Hello Client 9"))
 
 		time.Sleep(time.Second / 30)
 
@@ -121,11 +113,11 @@ func client() {
 				break
 			}
 
-			if m.MsgType == -1 { // message type -1 is status change
-				//log.Println("Status: " + m.Status)
-			}
+			//if m.MsgType == -1 { // message type -1 is status change
+			//log.Println("Status: " + m.Status)
+			//}
 
-			if m.MsgType == -2 { // message type -2 is an error, these won't automatically cause the recieve channel to close.
+			if m.MsgType == -2 { // message type -2 is an error, these won't automatically cause the received channel to close.
 				log.Println("Error: " + err.Error())
 			}
 
@@ -159,20 +151,6 @@ func clientSend(cc *ipc.Client) {
 
 }
 
-func clientSend1(cc *ipc.Client) {
-
-	for {
-
-		_ = cc.Write(1, []byte("hello server 1"))
-		_ = cc.Write(9, []byte("hello server 2"))
-		_ = cc.Write(34, []byte("hello server 3"))
-
-		time.Sleep(time.Second / 20)
-
-	}
-
-}
-
 func clientSend2(cc *ipc.Client) {
 
 	for {
@@ -186,6 +164,7 @@ func clientSend2(cc *ipc.Client) {
 	}
 }
 
+/*
 func clientRecv(c *ipc.Client) {
 
 	for {
@@ -197,11 +176,11 @@ func clientRecv(c *ipc.Client) {
 			break
 		}
 
-		if m.MsgType == -1 { // message type -1 is status change
-			//log.Println("Status: " + m.Status)
-		}
+		//if m.MsgType == -1 { // message type -1 is status change
+		//	//log.Println("Status: " + m.Status)
+		//}
 
-		if m.MsgType == -2 { // message type -2 is an error, these won't automatically cause the recieve channel to close.
+		if m.MsgType == -2 { // message type -2 is an error, these won't automatically cause the received channel to close.
 			log.Println("Error: " + err.Error())
 		}
 
@@ -214,3 +193,4 @@ func clientRecv(c *ipc.Client) {
 	}
 
 }
+*/
