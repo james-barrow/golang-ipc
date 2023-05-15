@@ -2,7 +2,7 @@ package ipc
 
 import "errors"
 
-//  returns the status of the connection as a string
+// returns the status of the connection as a string
 func (status *Status) String() string {
 
 	switch *status {
