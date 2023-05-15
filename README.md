@@ -61,7 +61,7 @@ Read and write data to the connection:
             dataType, data, err := sc.Read()
 
             if err == nil {
-                log.Println("Server recieved: "+string(data)+" - Message type: ", dataType)
+                log.Println("Server received: "+string(data)+" - Message type: ", dataType)
             } else {
                 log.Println(err)
                 break
@@ -74,7 +74,7 @@ Read and write data to the connection:
             dataType, data, err := cc.Read()
 
             if err == nil {
-                log.Println("Client recieved: "+string(data)+" - Message type: ", dataType)     
+                log.Println("Client recireceivedeved: "+string(data)+" - Message type: ", dataType)     
             } else {
                 log.Println(err)
                 break

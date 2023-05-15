@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"io"
+	"log"
 	"strings"
 	"time"
 )
@@ -24,7 +25,7 @@ func StartClient(ipcName string, config *ClientConfig) (*Client, error) {
 	cc := &Client{
 		Name:     ipcName,
 		status:   NotConnected,
-		recieved: make(chan *Message),
+		received: make(chan *Message),
 		toWrite:  make(chan *Message),
 	}
 
@@ -58,34 +59,32 @@ func StartClient(ipcName string, config *ClientConfig) (*Client, error) {
 	go startClient(cc)
 
 	return cc, nil
-
 }
 
-func startClient(cc *Client) {
+func startClient(c *Client) {
 
-	cc.status = Connecting
-	cc.recieved <- &Message{Status: cc.status.String(), MsgType: -1}
+	c.status = Connecting
+	c.received <- &Message{Status: c.status.String(), MsgType: -1}
 
-	err := cc.dial()
+	err := c.dial()
 	if err != nil {
-		cc.recieved <- &Message{err: err, MsgType: -2}
+		c.received <- &Message{err: err, MsgType: -2}
 		return
 	}
 
-	cc.status = Connected
-	cc.recieved <- &Message{Status: cc.status.String(), MsgType: -1}
+	c.status = Connected
+	c.received <- &Message{Status: c.status.String(), MsgType: -1}
 
-	go cc.read()
-	go cc.write()
-
+	go c.read()
+	go c.write()
 }
 
-func (cc *Client) read() {
+func (c *Client) read() {
 	bLen := make([]byte, 4)
 
 	for {
 
-		res := cc.readData(bLen)
+		res := c.readData(bLen)
 		if !res {
 			break
 		}
@@ -94,13 +93,13 @@ func (cc *Client) read() {
 
 		msgRecvd := make([]byte, mLen)
 
-		res = cc.readData(msgRecvd)
+		res = c.readData(msgRecvd)
 		if !res {
 			break
 		}
 
-		if cc.encryption {
-			msgFinal, err := decrypt(*cc.enc.cipher, msgRecvd)
+		if c.encryption {
+			msgFinal, err := decrypt(*c.enc.cipher, msgRecvd)
 			if err != nil {
 				break
 			}
@@ -108,7 +107,7 @@ func (cc *Client) read() {
 			if bytesToInt(msgFinal[:4]) == 0 {
 				//  type 0 = control message
 			} else {
-				cc.recieved <- &Message{Data: msgFinal[4:], MsgType: bytesToInt(msgFinal[:4])}
+				c.received <- &Message{Data: msgFinal[4:], MsgType: bytesToInt(msgFinal[:4])}
 			}
 
 		} else {
@@ -116,30 +115,29 @@ func (cc *Client) read() {
 			if bytesToInt(msgRecvd[:4]) == 0 {
 				//  type 0 = control message
 			} else {
-				cc.recieved <- &Message{Data: msgRecvd[4:], MsgType: bytesToInt(msgRecvd[:4])}
+				c.received <- &Message{Data: msgRecvd[4:], MsgType: bytesToInt(msgRecvd[:4])}
 			}
 		}
 	}
 }
 
-func (cc *Client) readData(buff []byte) bool {
+func (c *Client) readData(buff []byte) bool {
 
-	_, err := io.ReadFull(cc.conn, buff)
-	//_, err := cc.conn.Read(buff)
+	_, err := io.ReadFull(c.conn, buff)
 	if err != nil {
 		if strings.Contains(err.Error(), "EOF") { // the connection has been closed by the client.
-			cc.conn.Close()
+			c.conn.Close()
 
-			if cc.status != Closing || cc.status == Closed {
-				go cc.reconnect()
+			if c.status != Closing || c.status == Closed {
+				go c.reconnect()
 			}
 			return false
 		}
 
-		if cc.status == Closing {
-			cc.status = Closed
-			cc.recieved <- &Message{Status: cc.status.String(), MsgType: -1}
-			cc.recieved <- &Message{err: errors.New("Client has closed the connection"), MsgType: -2}
+		if c.status == Closing {
+			c.status = Closed
+			c.received <- &Message{Status: c.status.String(), MsgType: -1}
+			c.received <- &Message{err: errors.New("client has closed the connection"), MsgType: -2}
 			return false
 		}
 
@@ -155,36 +153,36 @@ func (cc *Client) readData(buff []byte) bool {
 func (c *Client) reconnect() {
 
 	c.status = ReConnecting
-	c.recieved <- &Message{Status: c.status.String(), MsgType: -1}
+	c.received <- &Message{Status: c.status.String(), MsgType: -1}
 
 	err := c.dial() // connect to the pipe
 	if err != nil {
 		if err.Error() == "Timed out trying to connect" {
 			c.status = Timeout
-			c.recieved <- &Message{Status: c.status.String(), MsgType: -1}
-			c.recieved <- &Message{err: errors.New("timed out trying to re-connect"), MsgType: -2}
+			c.received <- &Message{Status: c.status.String(), MsgType: -1}
+			c.received <- &Message{err: errors.New("timed out trying to re-connect"), MsgType: -2}
 		}
 
 		return
 	}
 
 	c.status = Connected
-	c.recieved <- &Message{Status: c.status.String(), MsgType: -1}
+	c.received <- &Message{Status: c.status.String(), MsgType: -1}
 
 	go c.read()
 }
 
-// Read - blocking function that waits until an non multipart message is recieved
+// Read - blocking function that waits until an non multipart message is received
 // returns the message type, data and any error.
 func (c *Client) Read() (*Message, error) {
 
-	m, ok := (<-c.recieved)
+	m, ok := (<-c.received)
 	if !ok {
 		return nil, errors.New("the recieve channel has been closed")
 	}
 
 	if m.err != nil {
-		close(c.recieved)
+		close(c.received)
 		close(c.toWrite)
 		return nil, m.err
 	}
@@ -220,7 +218,7 @@ func (c *Client) write() {
 
 		m, ok := <-c.toWrite
 
-		if !ok{
+		if !ok {
 			break
 		}
 
@@ -232,7 +230,8 @@ func (c *Client) write() {
 			toSend = append(toSend, m.Data...)
 			toSendEnc, err := encrypt(*c.enc.cipher, toSend)
 			if err != nil {
-				//return err
+				log.Println("error encrypting data", err)
+				continue
 			}
 			toSend = toSendEnc
 		} else {
@@ -246,7 +245,8 @@ func (c *Client) write() {
 
 		err := writer.Flush()
 		if err != nil {
-			//return err
+			log.Println("error flushing data", err)
+			continue
 		}
 
 	}

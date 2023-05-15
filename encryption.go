@@ -110,7 +110,7 @@ func recvPublic(conn net.Conn) (*ecdsa.PublicKey, error) {
 	}
 
 	if i != 97 {
-		return nil, errors.New("public key recieved isn't valid length")
+		return nil, errors.New("public key received isn't valid length")
 	}
 
 	recvdPub := bytesToPublicKey(buff[:i])

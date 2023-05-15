@@ -131,7 +131,7 @@ func (sc *Server) msgLength() error {
 
 }
 
-// 1st message recieved by the client
+// 1st message received by the client
 func (cc *Client) handshake() error {
 
 	err := cc.one()

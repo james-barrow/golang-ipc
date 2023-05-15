@@ -12,7 +12,7 @@ type Server struct {
 	listen      net.Listener
 	conn        net.Conn
 	status      Status
-	recieved    chan (*Message)
+	received    chan (*Message)
 	connChannel chan bool
 	toWrite     chan (*Message)
 	timeout     time.Duration
@@ -29,7 +29,7 @@ type Client struct {
 	status        Status
 	timeout       float64       //
 	retryTimer    time.Duration // number of seconds before trying to connect again
-	recieved      chan (*Message)
+	received      chan (*Message)
 	toWrite       chan (*Message)
 	encryption    bool
 	encryptionReq bool
@@ -37,11 +37,11 @@ type Client struct {
 	enc           *encryption
 }
 
-// Message - contains the  recieved message
+// Message - contains the  received message
 type Message struct {
 	err     error  // details of any error
 	MsgType int    // type of message sent - 0 is reserved
-	Data    []byte // message data recieved
+	Data    []byte // message data received
 	Status  string
 }
 

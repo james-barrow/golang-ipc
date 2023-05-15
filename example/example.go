@@ -34,7 +34,7 @@ func server() {
 
 			if err == nil {
 				if m.MsgType > 0 {
-					log.Println("Server recieved: "+string(m.Data)+" - Message type: ", m.MsgType)
+					log.Println("Server received: "+string(m.Data)+" - Message type: ", m.MsgType)
 				}
 
 			} else {
@@ -116,7 +116,7 @@ func client() {
 			m, err := cc.Read()
 
 			if err != nil {
-				// An error is only returned if the recieved channel has been closed,
+				// An error is only returned if the received channel has been closed,
 				//so you know the connection has either been intentionally closed or has timmed out waiting to connect/re-connect.
 				break
 			}
@@ -129,10 +129,10 @@ func client() {
 				log.Println("Error: " + err.Error())
 			}
 
-			if m.MsgType > 0 { // all message types above 0 have been recieved over the connection
+			if m.MsgType > 0 { // all message types above 0 have been received over the connection
 
 				log.Println(" Message type: ", m.MsgType)
-				log.Println("Client recieved: " + string(m.Data))
+				log.Println("Client received: " + string(m.Data))
 			}
 			//}
 		}
@@ -192,7 +192,7 @@ func clientRecv(c *ipc.Client) {
 		m, err := c.Read()
 
 		if err != nil {
-			// An error is only returned if the recieved channel has been closed,
+			// An error is only returned if the received channel has been closed,
 			//so you know the connection has either been intentionally closed or has timmed out waiting to connect/re-connect.
 			break
 		}
@@ -205,10 +205,10 @@ func clientRecv(c *ipc.Client) {
 			log.Println("Error: " + err.Error())
 		}
 
-		if m.MsgType > 0 { // all message types above 0 have been recieved over the connection
+		if m.MsgType > 0 { // all message types above 0 have been received over the connection
 
 			log.Println(" Message type: ", m.MsgType)
-			log.Println("Client recieved: " + string(m.Data))
+			log.Println("Client received: " + string(m.Data))
 		}
 		//}
 	}

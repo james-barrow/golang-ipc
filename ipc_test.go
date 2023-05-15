@@ -233,7 +233,7 @@ func TestRead(t *testing.T) {
 	sIPC := &Server{
 		name:     "Test",
 		status:   NotConnected,
-		recieved: make(chan *Message),
+		received: make(chan *Message),
 		timeout:  0,
 	}
 
@@ -245,11 +245,11 @@ func TestRead(t *testing.T) {
 
 		_, err := sIPC.Read()
 		if err != nil {
-			t.Error("err should be nill as tbe read function should read the 1st message added to recieved")
+			t.Error("err should be nill as tbe read function should read the 1st message added to received")
 		}
 		_, err2 := sIPC.Read()
 		if err2 != nil {
-			t.Error("err should be nill as tbe read function should read the 1st message added to recieved")
+			t.Error("err should be nill as tbe read function should read the 1st message added to received")
 		}
 
 		_, err3 := sIPC.Read()
@@ -262,9 +262,9 @@ func TestRead(t *testing.T) {
 
 	}(sIPC)
 
-	sIPC.recieved <- &Message{MsgType: 1, Data: []byte("message 1")}
-	sIPC.recieved <- &Message{MsgType: 1, Data: []byte("message 2")}
-	close(sIPC.recieved) // close channel
+	sIPC.received <- &Message{MsgType: 1, Data: []byte("message 1")}
+	sIPC.received <- &Message{MsgType: 1, Data: []byte("message 2")}
+	close(sIPC.received) // close channel
 
 	<-serverFinished
 
@@ -276,7 +276,7 @@ func TestRead(t *testing.T) {
 		timeout:    2,
 		retryTimer: 1,
 		status:     NotConnected,
-		recieved:   make(chan *Message),
+		received:   make(chan *Message),
 	}
 
 	cIPC.status = Connected
@@ -287,11 +287,11 @@ func TestRead(t *testing.T) {
 
 		_, err4 := cIPC.Read()
 		if err4 != nil {
-			t.Error("err should be nill as tbe read function should read the 1st message added to recieved")
+			t.Error("err should be nill as tbe read function should read the 1st message added to received")
 		}
 		_, err5 := cIPC.Read()
 		if err5 != nil {
-			t.Error("err should be nill as tbe read function should read the 1st message added to recieved")
+			t.Error("err should be nill as tbe read function should read the 1st message added to received")
 		}
 
 		_, err6 := cIPC.Read()
@@ -303,9 +303,9 @@ func TestRead(t *testing.T) {
 
 	}()
 
-	cIPC.recieved <- &Message{MsgType: 1, Data: []byte("message 1")}
-	cIPC.recieved <- &Message{MsgType: 1, Data: []byte("message 1")}
-	close(cIPC.recieved) // close recieve channel
+	cIPC.received <- &Message{MsgType: 1, Data: []byte("message 1")}
+	cIPC.received <- &Message{MsgType: 1, Data: []byte("message 1")}
+	close(cIPC.received) // close recieve channel
 
 	<-clientFinished
 
@@ -389,6 +389,7 @@ func TestStatus(t *testing.T) {
 
 }
 
+/*
 func checkStatus(sc *Server, t *testing.T) bool {
 
 	for i := 0; i < 25; i++ {
@@ -407,6 +408,7 @@ func checkStatus(sc *Server, t *testing.T) bool {
 	return false
 
 }
+*/
 
 func TestGetConnected(t *testing.T) {
 
@@ -465,7 +467,7 @@ func TestServerWrongMessageType(t *testing.T) {
 
 			if ready == true {
 				if m.MsgType != 5 {
-					// recieved wrong message type
+					// received wrong message type
 
 				} else {
 					t.Error("should have got wrong message type")
@@ -544,7 +546,7 @@ func TestClientWrongMessageType(t *testing.T) {
 
 				if err45 == nil {
 					if m.MsgType != 5 {
-						// recieved wrong message type
+						// received wrong message type
 					} else {
 						t.Error("should have got wrong message type")
 					}
@@ -611,7 +613,7 @@ func TestServerCorrectMessageType(t *testing.T) {
 			if ready == true {
 				if err23 == nil {
 					if m.MsgType == 5 {
-						// recieved correct message type
+						// received correct message type
 					} else {
 						t.Error("should have got correct message type")
 					}
@@ -683,7 +685,7 @@ func TestClientCorrectMessageType(t *testing.T) {
 			if ready == true {
 				if err34 == nil {
 					if m.MsgType == 5 {
-						// recieved correct message type
+						// received correct message type
 					} else {
 						t.Error("should have got correct message type")
 					}
@@ -753,9 +755,9 @@ func TestServerSendMessage(t *testing.T) {
 				if err56 == nil {
 					if m.MsgType == 5 {
 						if string(m.Data) == "Here is a test message sent from the server to the client... -/and some more test data to pad it out a bit" {
-							// correct msg has been recieved
+							// correct msg has been received
 						} else {
-							t.Error("Message recieved is wrong")
+							t.Error("Message recreceivedieved is wrong")
 						}
 					} else {
 						t.Error("should have got correct message type")
@@ -832,9 +834,9 @@ func TestClientSendMessage(t *testing.T) {
 					if m.MsgType == 5 {
 
 						if string(m.Data) == "Here is a test message sent from the client to the server... -/and some more test data to pad it out a bit" {
-							// correct msg has been recieved
+							// correct msg has been received
 						} else {
-							t.Error("Message recieved is wrong")
+							t.Error("Message recreceivedieved is wrong")
 						}
 
 					} else {
@@ -996,8 +998,8 @@ func TestClientClose(t *testing.T) {
 		for {
 
 			m, _ := sc.Read()
-			if m.Status == "Connected" {
-			}
+			//if m.Status == "Connected" {
+			//}
 
 			if m.Status == "Re-connecting" {
 				holdIt <- false
@@ -1056,8 +1058,8 @@ func TestServerClose(t *testing.T) {
 
 			m, _ := cc.Read()
 
-			if m.Status == "Connected" {
-			}
+			//if m.Status == "Connected" {
+			//}
 
 			if m.Status == "Re-connecting" {
 				holdIt <- false
@@ -1564,7 +1566,7 @@ func TestServerSendWrongVersionNumber(t *testing.T) {
 	cc := &Client{
 		Name:          "",
 		status:        NotConnected,
-		recieved:      make(chan *Message),
+		received:      make(chan *Message),
 		encryptionReq: false,
 	}
 
@@ -1608,7 +1610,7 @@ func TestServerWrongVersionNumber(t *testing.T) {
 	sc := &Server{
 		name:     "test6",
 		status:   NotConnected,
-		recieved: make(chan *Message),
+		received: make(chan *Message),
 	}
 
 	go func() {
