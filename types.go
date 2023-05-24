@@ -8,18 +8,17 @@ import (
 
 // Server - holds the details of the server connection & config.
 type Server struct {
-	name        string
-	listen      net.Listener
-	conn        net.Conn
-	status      Status
-	received    chan (*Message)
-	connChannel chan bool
-	toWrite     chan (*Message)
-	timeout     time.Duration
-	encryption  bool
-	maxMsgSize  int
-	enc         *encryption
-	unMask      bool
+	name       string
+	listen     net.Listener
+	conn       net.Conn
+	status     Status
+	received   chan (*Message)
+	toWrite    chan (*Message)
+	timeout    time.Duration
+	encryption bool
+	maxMsgSize int
+	enc        *encryption
+	unMask     bool
 }
 
 // Client - holds the details of the client connection and config.
@@ -37,12 +36,12 @@ type Client struct {
 	enc           *encryption
 }
 
-// Message - contains the  received message
+// Message - contains the received message
 type Message struct {
-	err     error  // details of any error
-	MsgType int    // type of message sent - 0 is reserved
+	Err     error  // details of any error
+	MsgType int    // 0 = reserved , -1 is an internal message (disconnection or error etc), all messages recieved will be > 0
 	Data    []byte // message data received
-	Status  string
+	Status  string // the status of the connection
 }
 
 // Status - Status of the connection
@@ -68,11 +67,12 @@ const (
 	Error Status = iota
 	// Timeout - 8
 	Timeout Status = iota
+	// Disconnected - 9
+	Disconnected Status = iota
 )
 
 // ServerConfig - used to pass configuation overrides to ServerStart()
 type ServerConfig struct {
-	Timeout           time.Duration
 	MaxMsgSize        int
 	Encryption        bool
 	UnmaskPermissions bool

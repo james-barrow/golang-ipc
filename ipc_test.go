@@ -1,6 +1,9 @@
 package ipc
 
 import (
+	"fmt"
+	"net"
+	"os"
 	"testing"
 	"time"
 )
@@ -43,7 +46,6 @@ func TestStartUp_Configs(t *testing.T) {
 		t.Error(err)
 	}
 
-	scon.Timeout = -1
 	scon.MaxMsgSize = -1
 
 	_, err5 := StartServer("test", scon)
@@ -75,7 +77,7 @@ func TestStartUp_Configs(t *testing.T) {
 	t.Run("Unmask Server Socket Permissions", func(t *testing.T) {
 		scon.UnmaskPermissions = true
 
-		_, err := StartServer("test_perm", scon)
+		srv, err := StartServer("test_perm", scon)
 		if err != nil {
 			t.Error(err)
 		}
@@ -83,24 +85,24 @@ func TestStartUp_Configs(t *testing.T) {
 		// test would not work in windows
 		// can check test_perm.sock in /tmp after running tests to see perms
 
-		/*
-			time.Sleep(time.Second / 4)
+		time.Sleep(time.Second / 4)
 
-			info, err := os.Stat(srv.listen.Addr().String())
-			if err != nil {
-				t.Error(err)
-			}
-			got := fmt.Sprintf("%04o", info.Mode().Perm())
-			want := "0777"
+		info, err := os.Stat(srv.listen.Addr().String())
+		if err != nil {
+			t.Error(err)
+		}
+		got := fmt.Sprintf("%04o", info.Mode().Perm())
+		want := "0777"
 
-			if got != want {
-				t.Errorf("Got %q, Wanted %q", got, want)
-			}
-		*/
+		if got != want {
+			t.Errorf("Got %q, Wanted %q", got, want)
+		}
+
 		scon.UnmaskPermissions = false
 	})
-
 }
+
+/*
 func TestStartUp_Timeout(t *testing.T) {
 
 	scon := &ServerConfig{
@@ -113,7 +115,7 @@ func TestStartUp_Timeout(t *testing.T) {
 		_, err1 := sc.Read()
 
 		if err1 != nil {
-			if err1.Error() != "Timed out waiting for client to connect" {
+			if err1.Error() != "timed out waiting for client to connect" {
 				t.Error("should of got server timeout")
 			}
 			break
@@ -131,7 +133,7 @@ func TestStartUp_Timeout(t *testing.T) {
 	for {
 		_, err := cc.Read()
 		if err != nil {
-			if err.Error() != "Timed out trying to connect" {
+			if err.Error() != "timed out trying to connect" {
 				t.Error("should of got timeout as client was trying to connect")
 			}
 
@@ -141,6 +143,7 @@ func TestStartUp_Timeout(t *testing.T) {
 	}
 
 }
+*/
 
 func TestWrite(t *testing.T) {
 
@@ -182,14 +185,14 @@ func TestWrite(t *testing.T) {
 	buf := make([]byte, 1)
 
 	err3 := sc.Write(0, buf)
-	if err3.Error() != "Message type 0 is reserved" {
+	if err3.Error() != "message type 0 is reserved" {
 		t.Error("0 is not allowed as a message type")
 	}
 
 	buf = make([]byte, sc.maxMsgSize+5)
 	err4 := sc.Write(2, buf)
 
-	if err4.Error() != "Message exceeds maximum message length" {
+	if err4.Error() != "message exceeds maximum message length" {
 		t.Error("There should be an error as the data we're attempting to write is bigger than the maxMsgSize")
 	}
 
@@ -225,7 +228,6 @@ func TestWrite(t *testing.T) {
 	} else {
 		t.Error("we should have an error becuse there is no connection")
 	}
-
 }
 
 func TestRead(t *testing.T) {
@@ -308,7 +310,6 @@ func TestRead(t *testing.T) {
 	close(cIPC.received) // close received channel
 
 	<-clientFinished
-
 }
 
 func TestStatus(t *testing.T) {
@@ -351,8 +352,8 @@ func TestStatus(t *testing.T) {
 
 	s3 := sc.getStatus()
 
-	if s3.String() != "Re-connecting" {
-		t.Error("status string should have returned Re-connecting")
+	if s3.String() != "Reconnecting" {
+		t.Error("status string should have returned Reconnecting")
 	}
 
 	sc.status = Closed
@@ -371,7 +372,26 @@ func TestStatus(t *testing.T) {
 		t.Error("status string should have returned Error")
 	}
 
-	sc.Status()
+	sc.status = Closing
+
+	s6 := sc.getStatus()
+
+	if s6.String() != "Closing" {
+		t.Error("status string should have returned Error")
+	}
+
+	if s6.String() != "Closing" {
+		t.Error("status string should have returned Error")
+	}
+
+	sc.status = 33
+
+	s7 := sc.getStatus()
+
+	fmt.Println(s7.String())
+	if s7.String() != "Status not found" {
+		t.Error("status string should have returned 'Status not found'")
+	}
 
 	cc := &Client{
 		status: NotConnected,
@@ -386,29 +406,7 @@ func TestStatus(t *testing.T) {
 
 	cc2.getStatus()
 	cc2.Status()
-
 }
-
-/*
-func checkStatus(sc *Server, t *testing.T) bool {
-
-	for i := 0; i < 25; i++ {
-
-		if sc.getStatus() == 3 {
-			return true
-
-		} else if i == 25 {
-			t.Error("Server failed to connect")
-			break
-		}
-
-		time.Sleep(time.Second / 5)
-	}
-
-	return false
-
-}
-*/
 
 func TestGetConnected(t *testing.T) {
 
@@ -432,7 +430,6 @@ func TestGetConnected(t *testing.T) {
 			break
 		}
 	}
-
 }
 
 func TestServerWrongMessageType(t *testing.T) {
@@ -567,7 +564,6 @@ func TestClientWrongMessageType(t *testing.T) {
 	sc.Write(2, []byte(""))
 
 	<-complete
-
 }
 func TestServerCorrectMessageType(t *testing.T) {
 
@@ -635,7 +631,6 @@ func TestServerCorrectMessageType(t *testing.T) {
 	sc.Write(5, []byte(""))
 
 	<-complete
-
 }
 
 func TestClientCorrectMessageType(t *testing.T) {
@@ -705,7 +700,6 @@ func TestClientCorrectMessageType(t *testing.T) {
 
 	cc.Write(5, []byte(""))
 	<-complete
-
 }
 func TestServerSendMessage(t *testing.T) {
 
@@ -783,7 +777,6 @@ func TestServerSendMessage(t *testing.T) {
 	sc.Write(5, []byte("Here is a test message sent from the server to the client... -/and some more test data to pad it out a bit"))
 
 	<-complete
-
 }
 func TestClientSendMessage(t *testing.T) {
 
@@ -861,6 +854,23 @@ func TestClientSendMessage(t *testing.T) {
 	cc.Write(5, []byte("Here is a test message sent from the client to the server... -/and some more test data to pad it out a bit"))
 
 	<-complete
+}
+
+func TestEncryptionFunctions(t *testing.T) {
+
+	res := publicKeyToBytes(nil)
+	if len(res) != 0 {
+		t.Error("should have returned 0 bytes")
+
+	}
+
+	buff := make([]byte, 0)
+
+	if bytesToPublicKey(buff) != nil {
+		t.Error("should have failed as buff is 0 bytes")
+	}
+
+
 
 }
 
@@ -931,7 +941,6 @@ func TestNoEncrytion(t *testing.T) {
 
 	<-complete
 	<-complete2
-
 }
 func TestServerWrongEncrytion(t *testing.T) {
 
@@ -974,7 +983,6 @@ func TestServerWrongEncrytion(t *testing.T) {
 			break
 		}
 	}
-
 }
 
 func TestClientClose(t *testing.T) {
@@ -998,10 +1006,8 @@ func TestClientClose(t *testing.T) {
 		for {
 
 			m, _ := sc.Read()
-			//if m.Status == "Connected" {
-			//}
 
-			if m.Status == "Re-connecting" {
+			if m.Status == "Disconnected" {
 				holdIt <- false
 				break
 			}
@@ -1009,8 +1015,6 @@ func TestClientClose(t *testing.T) {
 		}
 
 	}()
-
-	ready := false
 
 	for {
 
@@ -1022,18 +1026,13 @@ func TestClientClose(t *testing.T) {
 			}
 
 			if mm.Status == "Closed" {
-				ready = true
+				break
 			}
-		}
-
-		if err != nil && ready == true {
-			break
 		}
 
 	}
 
 	<-holdIt
-
 }
 
 func TestServerClose(t *testing.T) {
@@ -1058,18 +1057,13 @@ func TestServerClose(t *testing.T) {
 
 			m, _ := cc.Read()
 
-			//if m.Status == "Connected" {
-			//}
-
-			if m.Status == "Re-connecting" {
+			if m.Status == "Reconnecting" {
 				holdIt <- false
 				break
 			}
 		}
 
 	}()
-
-	ready := true
 
 	for {
 
@@ -1085,15 +1079,11 @@ func TestServerClose(t *testing.T) {
 			}
 		}
 
-		if err2 != nil && ready == true {
-			break
-		}
-
 	}
 
 	<-holdIt
-
 }
+
 func TestClientReconnect(t *testing.T) {
 
 	sc, err := StartServer("test127", nil)
@@ -1135,7 +1125,7 @@ func TestClientReconnect(t *testing.T) {
 				clientConnected <- true
 			}
 
-			if m.Status == "Re-connecting" {
+			if m.Status == "Reconnecting" {
 				reconnectCheck = 2
 			}
 
@@ -1164,85 +1154,11 @@ func TestClientReconnect(t *testing.T) {
 			break
 		}
 	}
-
-}
-
-func TestServerReconnect(t *testing.T) {
-
-	sc, err := StartServer("test337", nil)
-	if err != nil {
-		t.Error(err)
-	}
-
-	time.Sleep(time.Second / 4)
-
-	cc, err2 := StartClient("test337", nil)
-	if err2 != nil {
-		t.Error(err)
-	}
-	connected := make(chan bool, 1)
-	serverConfirm := make(chan bool, 1)
-	serverConnected := make(chan bool, 1)
-
-	go func() {
-
-		for {
-
-			m, _ := cc.Read()
-			if m.Status == "Connected" {
-				connected <- true
-				break
-			}
-
-		}
-	}()
-
-	go func() {
-
-		reconnectCheck := 0
-
-		for {
-
-			m, _ := sc.Read()
-			if m.Status == "Connected" {
-				serverConnected <- true
-			}
-
-			if m.Status == "Re-connecting" {
-				reconnectCheck = 2
-			}
-
-			if m.Status == "Connected" && reconnectCheck == 2 {
-				serverConfirm <- true
-				break
-			}
-		}
-	}()
-
-	<-connected
-	<-serverConnected
-
-	cc.Close()
-
-	cc2, err2 := StartClient("test337", nil)
-	if err2 != nil {
-		t.Error(err)
-	}
-
-	for {
-
-		m, _ := cc2.Read()
-		if m.Status == "Connected" {
-			<-serverConfirm
-			break
-		}
-	}
-
 }
 
 func TestClientReconnectTimeout(t *testing.T) {
 
-	sc, err := StartServer("test7", nil)
+	server, err := StartServer("test7", nil)
 	if err != nil {
 		t.Error(err)
 	}
@@ -1258,91 +1174,66 @@ func TestClientReconnectTimeout(t *testing.T) {
 	if err2 != nil {
 		t.Error(err)
 	}
-	connected := make(chan bool, 1)
-	clientTimout := make(chan bool, 1)
-	clientConnected := make(chan bool, 1)
-	clientError := make(chan bool, 1)
 
 	go func() {
 
 		for {
 
-			m, _ := sc.Read()
+			m, _ := server.Read()
 			if m.Status == "Connected" {
-				connected <- true
+				server.Close()
 				break
 			}
 
 		}
 	}()
 
-	go func() {
+	connect := false
+	reconnect := false
 
-		reconnect := false
+	for {
 
-		for {
+		mm, err5 := cc.Read()
 
-			mm, err5 := cc.Read()
-
-			if err5 == nil {
-				if mm.Status == "Connected" {
-
-					clientConnected <- true
-				}
-
-				if mm.Status == "Re-connecting" {
-					reconnect = true
-				}
-
-				if mm.Status == "Timeout" && reconnect == true {
-					clientTimout <- true
-
-				}
+		if err5 == nil {
+			if mm.Status == "Connected" {
+				connect = true
 			}
 
-			if err5 != nil {
-				if err5.Error() != "Timed out trying to re-connect" {
-					t.Fatal("should have got the timed out error")
-				}
+			if mm.Status == "Reconnecting" {
+				reconnect = true
+			}
 
-				clientError <- true
-				break
-
+			if mm.Status == "Timeout" && reconnect == true && connect == true {
+				return
 			}
 		}
-	}()
 
-	<-connected
-	<-clientConnected
+		if err5 != nil {
+			if err5.Error() != "timed out trying to re-connect" {
+				t.Fatal("should have got the timed out error")
+			}
 
-	sc.Close()
+			break
 
-	<-clientTimout
-	<-clientError
+		}
+	}
 }
 
-func TestServerReconnectTimeout(t *testing.T) {
+func TestServerReconnect(t *testing.T) {
 
-	config := &ServerConfig{
-		Timeout:    1,
-		Encryption: true,
-	}
-
-	sc, err := StartServer("test7", config)
+	sc, err := StartServer("test127", nil)
 	if err != nil {
 		t.Error(err)
 	}
 
-	time.Sleep(time.Second / 4)
-
-	cc, err2 := StartClient("test7", nil)
+	cc, err2 := StartClient("test127", nil)
 	if err2 != nil {
-		t.Error(err)
+		t.Error(err2)
 	}
 	connected := make(chan bool, 1)
-	serverTimout := make(chan bool, 1)
-	serverConnected := make(chan bool, 1)
-	serverError := make(chan bool, 1)
+	clientConfirm := make(chan bool, 1)
+	clientConnected := make(chan bool, 1)
 
 	go func() {
 
@@ -1350,6 +1241,8 @@ func TestServerReconnectTimeout(t *testing.T) {
 
 			m, _ := cc.Read()
 			if m.Status == "Connected" {
+				<-clientConnected
+
 				connected <- true
 				break
 			}
@@ -1359,70 +1252,68 @@ func TestServerReconnectTimeout(t *testing.T) {
 
 	go func() {
 
-		reconnect := false
+		reconnectCheck := 0
 
 		for {
 
 			m, err := sc.Read()
-
-			if err == nil {
-				if m.Status == "Connected" {
-					serverConnected <- true
-				}
-
-				if m.Status == "Re-connecting" {
-					reconnect = true
-				}
-
-				if m.Status == "Timeout" && reconnect == true {
-					serverTimout <- true
-				}
-			}
-
 			if err != nil {
-				if err.Error() != "Timed out waiting for client to connect" {
-					t.Fatal("the error should be timed out waiting for client")
-				} else {
-					serverError <- true
-					break
-				}
+				fmt.Println(err)
+				return
 			}
 
+			if m.Status == "Connected" {
+				clientConnected <- true
+			}
+
+			if m.Status == "Disconnected" {
+				reconnectCheck = 1
+			}
+
+			if m.Status == "Connected" && reconnectCheck == 1 {
+				clientConfirm <- true
+				break
+			}
 		}
 	}()
 
 	<-connected
-	<-serverConnected
 
 	cc.Close()
 
-	<-serverTimout
-	<-serverError
-}
-
-// From here
-func TestServerReadClose(t *testing.T) {
-
-	config := &ServerConfig{
-		Timeout:    1,
-		Encryption: true,
+	c2, err := StartClient("test127", nil)
+	if err != nil {
+		t.Error(err)
 	}
 
-	sc, err := StartServer("test7Q", config)
+	for {
+
+		m, _ := c2.Read()
+		if m.Status == "Connected" {
+			break
+		}
+	}
+
+	<-clientConfirm
+}
+
+func TestServerReconnect2(t *testing.T) {
+
+	sc, err := StartServer("test337", nil)
 	if err != nil {
 		t.Error(err)
 	}
 
 	time.Sleep(time.Second / 4)
 
-	cc, err2 := StartClient("test7Q", nil)
+	cc, err2 := StartClient("test337", nil)
 	if err2 != nil {
 		t.Error(err)
 	}
-	connected := make(chan bool, 1)
-	serverTimout := make(chan bool, 1)
-	serverConnected := make(chan bool, 1)
-	serverErrorTwo := make(chan bool, 1)
+
+	hasConnected := make(chan bool)
+	hasDisconnected := make(chan bool)
+	hasReconnected := make(chan bool)
 
 	go func() {
 
@@ -1430,47 +1321,57 @@ func TestServerReadClose(t *testing.T) {
 
 			m, _ := cc.Read()
 			if m.Status == "Connected" {
-				connected <- true
-				break
+
+				<-hasConnected
+
+				cc.Close()
+
+				<-hasDisconnected
+
+				c2, err2 := StartClient("test337", nil)
+				if err2 != nil {
+					t.Error(err)
+				}
+
+				for {
+
+					m, _ := c2.Read()
+					if m.Status == "Connected" {
+						break
+					}
+				}
+
+				<-hasReconnected
+
+				return
 			}
 
 		}
 	}()
 
-	go func() {
+	connect := false
+	disconnect := false
 
-		for {
+	for {
 
-			m, err3 := sc.Read()
+		m, _ := sc.Read()
+		if m.Status == "Connected" && connect == false {
+			hasConnected <- true
+			connect = true
 
-			if err3 != nil {
-				if err3.Error() == "the received channel has been closed" {
-					serverErrorTwo <- true // after the connection times out the received channel is closed, so we're now testing that the close error is returned.
-					// This is the only error the received function returns.
-					break
-				}
-			}
-
-			if err3 == nil {
-				if m.Status == "Connected" {
-					serverConnected <- true
-				}
-
-				if m.Status == "Timeout" {
-					serverTimout <- true // checks the connection times out
-				}
-			}
 		}
 
-	}()
+		if m.Status == "Disconnected" {
+			hasDisconnected <- true
+			disconnect = true
 
-	<-connected
-	<-serverConnected
+		}
 
-	cc.Close()
-
-	<-serverTimout
-	<-serverErrorTwo
+		if m.Status == "Connected" && connect == true && disconnect == true {
+			hasReconnected <- true
+			return
+		}
+	}
 }
 
 func TestClientReadClose(t *testing.T) {
@@ -1530,7 +1431,7 @@ func TestClientReadClose(t *testing.T) {
 					clientConnected <- true
 				}
 
-				if m.Status == "Re-connecting" {
+				if m.Status == "Reconnecting" {
 					reconnect = true
 				}
 
@@ -1551,58 +1452,68 @@ func TestClientReadClose(t *testing.T) {
 	<-clientError
 }
 
-/*
-
-func TestServerSendWrongVersionNumber(t *testing.T) {
+func TestServerReceiveWrongVersionNumber(t *testing.T) {
 
 	sc, err := StartServer("test5", nil)
 	if err != nil {
 		t.Error(err)
 	}
 
-	time.Sleep(time.Second / 4)
-
-	cc := &Client{
-		Name:          "",
-		status:        NotConnected,
-		received:      make(chan *Message),
-		encryptionReq: false,
-	}
-
 	go func() {
-		cc.Read()
+
+		cc := &Client{
+			Name:          "",
+			status:        NotConnected,
+			received:      make(chan *Message),
+			encryptionReq: false,
+		}
+
+		time.Sleep(3 * time.Second)
+
+		base := "/tmp/"
+		sock := ".sock"
+		conn, _ := net.Dial("unix", base+"test5"+sock)
+
+		cc.conn = conn
+
+		recv := make([]byte, 2)
+		_, err2 := cc.conn.Read(recv)
+		if err2 != nil {
+			return
+		}
+
+		if recv[0] != 4 {
+			cc.handshakeSendReply(1)
+			return
+		}
+
 	}()
 
-	go func() {
-		m := sc.Read()
+	for {
+
+		m, err := sc.Read()
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
 		if m.Err != nil {
 			if m.Err.Error() != "client has a different version number" {
 				t.Error("should have error because server sent the client the wrong version number 1")
 			}
 		}
-	}()
-
-	base := "/tmp/"
-	sock := ".sock"
-	conn, _ := net.Dial("unix", base+"test5"+sock)
-
-	cc.conn = conn
-
-	recv := make([]byte, 2)
-	_, err2 := cc.conn.Read(recv)
-	if err2 != nil {
-		//return errors.New("failed to received handshake message")
 	}
-
-	if recv[0] != 4 {
-		cc.handshakeSendReply(1)
-		//return errors.New("server has sent a different version number")
-	}
-
-	time.Sleep(3 * time.Second)
-
 }
 
+func TestClientReceiveWrongVersionNumber(t *testing.T) {
+
+	//conn, err := s.listen.Accept()
+	//if err != nil {
+	//	break
+	//}
+}
+
+/*
 // This test will not pass on Windows unless the net.Listen part for unix sockets is replaced with winio.ListenPipe
 func TestServerWrongVersionNumber(t *testing.T) {
 

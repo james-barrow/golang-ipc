@@ -10,10 +10,7 @@ import (
 )
 
 // StartClient - start the ipc client.
-//
 // ipcName = is the name of the unix socket or named pipe that the client will try and connect to.
-// timeout = number of seconds before the socket/pipe times out trying to connect/re-cconnect - if -1 or 0 it never times out.
-// retryTimer = number of seconds before the client tries to connect again.
 func StartClient(ipcName string, config *ClientConfig) (*Client, error) {
 
 	err := checkIpcName(ipcName)
@@ -32,7 +29,7 @@ func StartClient(ipcName string, config *ClientConfig) (*Client, error) {
 	if config == nil {
 
 		cc.timeout = 0
-		cc.retryTimer = time.Duration(1)
+		cc.retryTimer = time.Duration(20)
 		cc.encryptionReq = true
 
 	} else {
@@ -68,7 +65,7 @@ func startClient(c *Client) {
 
 	err := c.dial()
 	if err != nil {
-		c.received <- &Message{err: err, MsgType: -2}
+		c.received <- &Message{Err: err, MsgType: -1}
 		return
 	}
 
@@ -137,7 +134,7 @@ func (c *Client) readData(buff []byte) bool {
 		if c.status == Closing {
 			c.status = Closed
 			c.received <- &Message{Status: c.status.String(), MsgType: -1}
-			c.received <- &Message{err: errors.New("client has closed the connection"), MsgType: -2}
+			c.received <- &Message{Err: errors.New("client has closed the connection"), MsgType: -2}
 			return false
 		}
 
@@ -157,10 +154,10 @@ func (c *Client) reconnect() {
 
 	err := c.dial() // connect to the pipe
 	if err != nil {
-		if err.Error() == "Timed out trying to connect" {
+		if err.Error() == "timed out trying to connect" {
 			c.status = Timeout
 			c.received <- &Message{Status: c.status.String(), MsgType: -1}
-			c.received <- &Message{err: errors.New("timed out trying to re-connect"), MsgType: -2}
+			c.received <- &Message{Err: errors.New("timed out trying to re-connect"), MsgType: -1}
 		}
 
 		return
@@ -172,8 +169,8 @@ func (c *Client) reconnect() {
 	go c.read()
 }
 
-// Read - blocking function that waits until an non multipart message is received
-// returns the message type, data and any error.
+// Read - blocking function that receices messages
+// if MsgType is a negative number its an internal message
 func (c *Client) Read() (*Message, error) {
 
 	m, ok := (<-c.received)
@@ -181,16 +178,16 @@ func (c *Client) Read() (*Message, error) {
 		return nil, errors.New("the received channel has been closed")
 	}
 
-	if m.err != nil {
+	if m.Err != nil {
 		close(c.received)
 		close(c.toWrite)
-		return nil, m.err
+		return nil, m.Err
 	}
 
 	return m, nil
 }
 
-// Write - writes a non multipart message to the ipc connection.
+// Write - writes a  message to the ipc connection.
 // msgType - denotes the type of data being sent. 0 is a reserved type for internal messages and errors.
 func (c *Client) Write(msgType int, message []byte) error {
 

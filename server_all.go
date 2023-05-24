@@ -10,8 +10,7 @@ import (
 
 // StartServer - starts the ipc server.
 //
-// ipcName = is the name of the unix socket or named pipe that will be created.
-// timeout = number of seconds before the socket/pipe times out waiting for a connection/re-cconnection - if -1 or 0 it never times out.
+// ipcName - is the name of the unix socket or named pipe that will be created, the client needs to use the same name
 func StartServer(ipcName string, config *ServerConfig) (*Server, error) {
 
 	err := checkIpcName(ipcName)
@@ -34,12 +33,6 @@ func StartServer(ipcName string, config *ServerConfig) (*Server, error) {
 
 	} else {
 
-		if config.Timeout < 0 {
-			s.timeout = 0
-		} else {
-			s.timeout = config.Timeout
-		}
-
 		if config.MaxMsgSize < 1024 {
 			s.maxMsgSize = maxMsgSize
 		} else {
@@ -59,75 +52,43 @@ func StartServer(ipcName string, config *ServerConfig) (*Server, error) {
 		}
 	}
 
-	go startServer(s)
+	err = s.run()
 
 	return s, err
 }
 
-func startServer(s *Server) {
-
-	err := s.run()
-	if err != nil {
-		s.received <- &Message{err: err, MsgType: -2}
-	}
-}
-
 func (s *Server) acceptLoop() {
+
 	for {
 		conn, err := s.listen.Accept()
 		if err != nil {
 			break
 		}
 
-		if s.status == Listening || s.status == ReConnecting {
+		if s.status == Listening || s.status == Disconnected {
 
 			s.conn = conn
 
 			err2 := s.handshake()
 			if err2 != nil {
-				s.received <- &Message{err: err2, MsgType: -2}
+				s.received <- &Message{Err: err2, MsgType: -1}
 				s.status = Error
 				s.listen.Close()
 				s.conn.Close()
 
 			} else {
+
 				go s.read()
 				go s.write()
 
 				s.status = Connected
 				s.received <- &Message{Status: s.status.String(), MsgType: -1}
-				s.connChannel <- true
 			}
 
 		}
 
 	}
 
-}
-
-func (s *Server) connectionTimer() error {
-
-	if s.timeout != 0 {
-
-		timeout := make(chan bool)
-
-		go func() {
-			time.Sleep(s.timeout * time.Second)
-			timeout <- true
-		}()
-
-		select {
-
-		case <-s.connChannel:
-			return nil
-		case <-timeout:
-			s.listen.Close()
-			return errors.New("timed out waiting for client to connect")
-		}
-	}
-
-	<-s.connChannel
-	return nil
 }
 
 func (s *Server) read() {
@@ -138,6 +99,8 @@ func (s *Server) read() {
 
 		res := s.readData(bLen)
 		if !res {
+			s.conn.Close()
+
 			break
 		}
 
@@ -147,13 +110,15 @@ func (s *Server) read() {
 
 		res = s.readData(msgRecvd)
 		if !res {
+			s.conn.Close()
+
 			break
 		}
 
 		if s.encryption {
 			msgFinal, err := decrypt(*s.enc.cipher, msgRecvd)
 			if err != nil {
-				s.received <- &Message{err: err, MsgType: -2}
+				s.received <- &Message{Err: err, MsgType: -1}
 				continue
 			}
 
@@ -172,6 +137,7 @@ func (s *Server) read() {
 		}
 
 	}
+
 }
 
 func (s *Server) readData(buff []byte) bool {
@@ -183,35 +149,24 @@ func (s *Server) readData(buff []byte) bool {
 
 			s.status = Closed
 			s.received <- &Message{Status: s.status.String(), MsgType: -1}
-			s.received <- &Message{err: errors.New("server has closed the connection"), MsgType: -2}
+			s.received <- &Message{Err: errors.New("server has closed the connection"), MsgType: -1}
 			return false
 		}
 
-		go s.reConnect()
-		return false
+		if err == io.EOF {
+
+			s.status = Disconnected
+			s.received <- &Message{Status: s.status.String(), MsgType: -1}
+			return false
+		}
 
 	}
 
 	return true
 }
 
-func (s *Server) reConnect() {
-
-	s.status = ReConnecting
-	s.received <- &Message{Status: s.status.String(), MsgType: -1}
-
-	err := s.connectionTimer()
-	if err != nil {
-		s.status = Timeout
-		s.received <- &Message{Status: s.status.String(), MsgType: -1}
-
-		s.received <- &Message{err: err, MsgType: -2}
-
-	}
-}
-
-// Read - blocking function that waits until an non multipart message is received
-
+// Read - blocking function, reads each message recieved
+// if MsgType is a negative number its an internal message
 func (s *Server) Read() (*Message, error) {
 
 	m, ok := (<-s.received)
@@ -219,16 +174,16 @@ func (s *Server) Read() (*Message, error) {
 		return nil, errors.New("the received channel has been closed")
 	}
 
-	if m.err != nil {
-		close(s.received)
-		close(s.toWrite)
-		return nil, m.err
+	if m.Err != nil {
+		//close(s.received)
+		//close(s.toWrite)
+		return nil, m.Err
 	}
 
 	return m, nil
 }
 
-// Write - writes a non multipart message to the ipc connection.
+// Write - writes a message to the ipc connection
 // msgType - denotes the type of data being sent. 0 is a reserved type for internal messages and errors.
 func (s *Server) Write(msgType int, message []byte) error {
 
@@ -296,11 +251,13 @@ func (s *Server) write() {
 	}
 }
 
+
 // getStatus - get the current status of the connection
 func (s *Server) getStatus() Status {
 
 	return s.status
 }
+
 
 // StatusCode - returns the current connection status
 func (s *Server) StatusCode() Status {

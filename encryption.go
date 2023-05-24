@@ -103,7 +103,7 @@ func sendPublic(conn net.Conn, pub *ecdsa.PublicKey) error {
 
 func recvPublic(conn net.Conn) (*ecdsa.PublicKey, error) {
 
-	buff := make([]byte, 300)
+	buff := make([]byte, 98)
 	i, err := conn.Read(buff)
 	if err != nil {
 		return nil, errors.New("didn't received public key")
@@ -145,7 +145,6 @@ func bytesToPublicKey(recvdPub []byte) *ecdsa.PublicKey {
 func createCipher(shared [32]byte) (*cipher.AEAD, error) {
 
 	b, err := aes.NewCipher(shared[:])
-
 	if err != nil {
 		return nil, err
 	}
@@ -162,11 +161,9 @@ func encrypt(g cipher.AEAD, data []byte) ([]byte, error) {
 
 	nonce := make([]byte, g.NonceSize())
 
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return nil, err
-	}
+	_, err := io.ReadFull(rand.Reader, nonce)
 
-	return g.Seal(nonce, nonce, data, nil), nil
+	return g.Seal(nonce, nonce, data, nil), err
 
 }
 

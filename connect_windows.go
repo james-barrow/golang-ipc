@@ -48,7 +48,7 @@ func (c *Client) dial() error {
 
 	for {
 		if c.timeout != 0 {
-			if time.Now().Sub(startTime).Seconds() > c.timeout {
+			if time.Since(startTime).Seconds() > c.timeout {
 				c.status = Closed
 				return errors.New("timed out trying to connect")
 			}

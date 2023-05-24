@@ -39,16 +39,9 @@ func (s *Server) run() error {
 
 	s.listen = listen
 
-	s.status = Listening
-	s.received <- &Message{Status: s.status.String(), MsgType: -1}
-	s.connChannel = make(chan bool)
-
 	go s.acceptLoop()
 
-	err = s.connectionTimer()
-	if err != nil {
-		return err
-	}
+	s.status = Listening
 
 	return nil
 
@@ -63,9 +56,10 @@ func (c *Client) dial() error {
 	startTime := time.Now()
 
 	for {
+		
 		if c.timeout != 0 {
 
-			if time.Now().Sub(startTime).Seconds() > c.timeout {
+			if time.Since(startTime).Seconds() > c.timeout {
 				c.status = Closed
 				return errors.New("timed out trying to connect")
 			}
@@ -79,7 +73,7 @@ func (c *Client) dial() error {
 			} else if strings.Contains(err.Error(), "connect: connection refused") {
 
 			} else {
-				c.received <- &Message{err: err, MsgType: -2}
+				c.received <- &Message{Err: err, MsgType: -1}
 			}
 
 		} else {
