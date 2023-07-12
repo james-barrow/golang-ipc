@@ -14,8 +14,11 @@ import (
 func (s *Server) run() error {
 
 	var pipeBase = `\\.\pipe\`
-
-	listen, err := winio.ListenPipe(pipeBase+s.name, nil)
+	pipeConfig := winio.PipeConfig{
+		InputBufferSize:  int32(s.maxMsgSize),
+		OutputBufferSize: int32(s.maxMsgSize),
+	}
+	listen, err := winio.ListenPipe(pipeBase+s.name, &pipeConfig)
 	if err != nil {
 
 		return err
