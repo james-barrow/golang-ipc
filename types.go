@@ -52,23 +52,23 @@ const (
 	// NotConnected - 0
 	NotConnected Status = iota
 	// Listening - 1
-	Listening Status = iota
+	Listening
 	// Connecting - 2
-	Connecting Status = iota
+	Connecting
 	// Connected - 3
-	Connected Status = iota
+	Connected
 	// ReConnecting - 4
-	ReConnecting Status = iota
+	ReConnecting
 	// Closed - 5
-	Closed Status = iota
+	Closed
 	// Closing - 6
-	Closing Status = iota
+	Closing
 	// Error - 7
-	Error Status = iota
+	Error
 	// Timeout - 8
-	Timeout Status = iota
+	Timeout
 	// Disconnected - 9
-	Disconnected Status = iota
+	Disconnected
 )
 
 // ServerConfig - used to pass configuation overrides to ServerStart()

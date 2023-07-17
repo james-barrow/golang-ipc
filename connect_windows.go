@@ -15,7 +15,13 @@ func (s *Server) run() error {
 
 	var pipeBase = `\\.\pipe\`
 
-	listen, err := winio.ListenPipe(pipeBase+s.name, nil)
+	var config *winio.PipeConfig
+
+	if s.unMask {
+		config = &winio.PipeConfig{SecurityDescriptor: "D:P(A;;GA;;;AU)"}
+	} 
+
+	listen, err := winio.ListenPipe(pipeBase+s.name, config)
 	if err != nil {
 
 		return err
@@ -25,14 +31,7 @@ func (s *Server) run() error {
 
 	s.status = Listening
 
-	s.connChannel = make(chan bool)
-
 	go s.acceptLoop()
-
-	err2 := s.connectionTimer()
-	if err2 != nil {
-		return err2
-	}
 
 	return nil
 
