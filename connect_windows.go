@@ -14,11 +14,18 @@ import (
 func (s *Server) run() error {
 
 	var pipeBase = `\\.\pipe\`
-	pipeConfig := winio.PipeConfig{
+
+  pipeConfig := winio.PipeConfig{
 		InputBufferSize:  int32(s.maxMsgSize),
 		OutputBufferSize: int32(s.maxMsgSize),
 	}
+  
+	if s.unMask {
+		pipeConfig = winio.PipeConfig{SecurityDescriptor: "D:P(A;;GA;;;AU)"}
+	} 
+
 	listen, err := winio.ListenPipe(pipeBase+s.name, &pipeConfig)
+
 	if err != nil {
 
 		return err
@@ -28,14 +35,7 @@ func (s *Server) run() error {
 
 	s.status = Listening
 
-	s.connChannel = make(chan bool)
-
 	go s.acceptLoop()
-
-	err2 := s.connectionTimer()
-	if err2 != nil {
-		return err2
-	}
 
 	return nil
 
