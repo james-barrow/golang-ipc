@@ -15,13 +15,17 @@ func (s *Server) run() error {
 
 	var pipeBase = `\\.\pipe\`
 
-	var config *winio.PipeConfig
-
+  pipeConfig := winio.PipeConfig{
+		InputBufferSize:  int32(s.maxMsgSize),
+		OutputBufferSize: int32(s.maxMsgSize),
+	}
+  
 	if s.unMask {
-		config = &winio.PipeConfig{SecurityDescriptor: "D:P(A;;GA;;;AU)"}
+		pipeConfig = winio.PipeConfig{SecurityDescriptor: "D:P(A;;GA;;;AU)"}
 	} 
 
-	listen, err := winio.ListenPipe(pipeBase+s.name, config)
+	listen, err := winio.ListenPipe(pipeBase+s.name, &pipeConfig)
+
 	if err != nil {
 
 		return err
