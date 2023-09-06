@@ -2,6 +2,7 @@ package ipc
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"io"
 	"log"
@@ -168,8 +169,7 @@ func (s *Server) readData(buff []byte) bool {
 // Read - blocking function, reads each message recieved
 // if MsgType is a negative number its an internal message
 func (s *Server) Read() (*Message, error) {
-
-	m, ok := (<-s.received)
+	m, ok := <-s.received
 	if !ok {
 		return nil, errors.New("the received channel has been closed")
 	}
@@ -181,6 +181,27 @@ func (s *Server) Read() (*Message, error) {
 	}
 
 	return m, nil
+}
+
+// ReadCtx - blocking function, but it reacts to end of context, reads each message received
+// if MsgType is a negative number it's an internal message
+func (s *Server) ReadCtx(ctx context.Context) (*Message, error) {
+	select {
+	case m, ok := <-s.received:
+		if !ok {
+			return nil, errors.New("the received channel has been closed")
+		}
+
+		if m.Err != nil {
+			//close(s.received)
+			//close(s.toWrite)
+			return nil, m.Err
+		}
+
+		return m, nil
+	case <-ctx.Done():
+		return nil, errors.New("termination signal detected")
+	}
 }
 
 // Write - writes a message to the ipc connection
@@ -251,13 +272,11 @@ func (s *Server) write() {
 	}
 }
 
-
 // getStatus - get the current status of the connection
 func (s *Server) getStatus() Status {
 
 	return s.status
 }
-
 
 // StatusCode - returns the current connection status
 func (s *Server) StatusCode() Status {
