@@ -1,4 +1,4 @@
-module github.com/q84fh/golang-ipc
+module github.com/james-barrow/golang-ipc
 
 go 1.15
 
