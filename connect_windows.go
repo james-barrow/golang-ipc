@@ -58,7 +58,7 @@ func (c *Client) dial() error {
 			if strings.Contains(err.Error(), "the system cannot find the file specified.") == true {
 
 			} else {
-				return err
+				c.received <- &Message{Err: err, MsgType: -1}
 			}
 
 		} else {
