@@ -55,10 +55,10 @@ func (c *Client) dial() error {
 		pn, err := winio.DialPipe(pipeBase+c.Name, nil)
 		if err != nil {
 
-			if strings.Contains(err.Error(), "the system cannot find the file specified.") == true {
-
+			errStr := strings.ToLower(err.Error())
+			if !strings.Contains(errStr, "the system cannot find the file specified.") {
 			} else {
-				return err
+				c.received <- &Message{Err: err, MsgType: -1}
 			}
 
 		} else {
