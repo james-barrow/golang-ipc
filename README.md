@@ -1,3 +1,9 @@
+
+**Archived.** I wrote this while developing
+ [Remote Tools](https://remote-tools.co.uk/), to let a Go program and an
+ Electron front end talk to each other. I ended up going with localhost and
+ a self-signed TLS certificate instead, so this is no longer maintained.
+
 # golang-ipc
  Golang Inter-process communication library for Window, Mac and Linux.
 
